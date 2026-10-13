@@ -106,11 +106,11 @@
 // Guide panel
 @property (nonatomic, strong) UIView *guidePanel;
 
-// Fun / cosmetic feature state
-@property (nonatomic, assign) BOOL snowActive;
-@property (nonatomic, assign) BOOL rainbowActive;
+// Pro-feature state
 @property (nonatomic, assign) BOOL autoChaosActive;
-@property (nonatomic, assign) NSInteger rainbowHueIndex;
+@property (nonatomic, assign) BOOL autoLeaderActive;
+@property (nonatomic, assign) CGPoint menuDragStart;
+@property (nonatomic, strong) UILabel *tacticalPill;
 
 @end
 
@@ -724,10 +724,11 @@
     if (rootW < 320) rootW = 375;
     if (rootH < 480) rootH = 667;
 
-    CGFloat targetW = 340;
-    CGFloat targetH = 560;
-    if (rootW < 350) targetW = MAX(280, rootW - 20);
-    if (rootH < 580) targetH = MAX(400, rootH - 100);
+    NSInteger sizePref = [[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_menu_size"]; // 0=Compact 1=Normal 2=Large
+    CGFloat targetW = (sizePref == 0) ? 304 : (sizePref == 2) ? 372 : 340;
+    CGFloat targetH = (sizePref == 0) ? 484 : (sizePref == 2) ? 648 : 560;
+    if (targetW > rootW - 16) targetW = MAX(280, rootW - 16);
+    if (targetH > rootH - 90) targetH = MAX(400, rootH - 90);
 
     UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
     self.menuContainer = [[UIVisualEffectView alloc] initWithEffect:blur];
@@ -741,6 +742,18 @@
     self.menuContainer.transform = CGAffineTransformMakeScale(0.88, 0.88);
 
     UIView *content = self.menuContainer.contentView;
+
+    // Draggable header strip (grab the top to move the whole menu).
+    UIView *dragStrip = [[UIView alloc] initWithFrame:CGRectMake(0, 0, targetW, 50)];
+    dragStrip.backgroundColor = [UIColor clearColor];
+    UIPanGestureRecognizer *drag = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleMenuDrag:)];
+    [dragStrip addGestureRecognizer:drag];
+    [content addSubview:dragStrip];
+    UIView *grabber = [[UIView alloc] initWithFrame:CGRectMake((targetW - 36) / 2.0, 5, 36, 4)];
+    grabber.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.3];
+    grabber.layer.cornerRadius = 2.0;
+    grabber.userInteractionEnabled = NO;
+    [dragStrip addSubview:grabber];
 
     // Header
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(20, 14, 300, 22)];
@@ -764,7 +777,7 @@
     [content addSubview:guideBtn];
 
     // Segmented Tab Selector (6 Distinct Tabs)
-    NSArray *tabs = @[@"Roles", @"Audio", @"Media", @"Telem", @"Troll", @"Fun"];
+    NSArray *tabs = @[@"Roles", @"Audio", @"Media", @"Telem", @"Troll", @"⚙️"];
     self.tabSelector = [[UISegmentedControl alloc] initWithItems:tabs];
     self.tabSelector.frame = CGRectMake(14, 56, 312, 28);
     self.tabSelector.selectedSegmentIndex = 0;
@@ -774,16 +787,16 @@
     [self.tabSelector addTarget:self action:@selector(tabChanged:) forControlEvents:UIControlEventValueChanged];
     [content addSubview:self.tabSelector];
 
-    // Create 6 scrollable tab views (Roles / Audio / Media / Telemetry / Troll / Fun)
+    // Create 6 scrollable tab views (Roles / Audio / Media / Telemetry / Troll / Pro)
     CGRect tabFrame = CGRectMake(0, 90, targetW, targetH - 150);
     UIScrollView *roleView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *audioView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *mediaView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *telemetryView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *trollView = [[UIScrollView alloc] initWithFrame:tabFrame];
-    UIScrollView *funView = [[UIScrollView alloc] initWithFrame:tabFrame];
+    UIScrollView *proView = [[UIScrollView alloc] initWithFrame:tabFrame];
 
-    for (UIScrollView *sv in @[roleView, audioView, mediaView, telemetryView, trollView, funView]) {
+    for (UIScrollView *sv in @[roleView, audioView, mediaView, telemetryView, trollView, proView]) {
         sv.showsVerticalScrollIndicator = YES;
         sv.alwaysBounceVertical = YES;
     }
@@ -793,15 +806,15 @@
     [self setupMediaTab:mediaView];
     [self setupTelemetryTab:telemetryView];
     [self setupTrollTab:trollView];
-    [self setupFunTab:funView];
+    [self setupProTab:proView];
 
     audioView.hidden = YES;
     mediaView.hidden = YES;
     telemetryView.hidden = YES;
     trollView.hidden = YES;
-    funView.hidden = YES;
+    proView.hidden = YES;
 
-    self.tabViews = @[roleView, audioView, mediaView, telemetryView, trollView, funView];
+    self.tabViews = @[roleView, audioView, mediaView, telemetryView, trollView, proView];
     for (UIView *tv in self.tabViews) {
         [content addSubview:tv];
     }
@@ -820,7 +833,7 @@
     [parentView addSubview:self.menuContainer];
 
     // Apply the user's saved menu theme to the freshly-built surface.
-    [self applyTheme:[[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_theme"]];
+    [self applyMenuTheme];
   } @catch (NSException *e) {
     NSLog(@"[RaveApexCore] setupMenuContainerInView guarded exception: %@", e);
     // Discard any partially-built surface so toggleMenuVisibility's circuit breaker
@@ -837,9 +850,18 @@
 
 - (void)tabChanged:(UISegmentedControl *)seg {
     if (!seg || self.tabViews.count == 0) return;
+    [self fireHaptic];
     NSInteger sel = seg.selectedSegmentIndex;
     for (NSUInteger i = 0; i < self.tabViews.count; i++) {
-        self.tabViews[i].hidden = ((NSInteger)i != sel);
+        UIView *tv = self.tabViews[i];
+        if ((NSInteger)i == sel) {
+            tv.hidden = NO;
+            tv.alpha = 0.0;
+            [UIView animateWithDuration:0.22 animations:^{ tv.alpha = 1.0; }];
+        } else {
+            tv.hidden = YES;
+            tv.alpha = 1.0;
+        }
     }
 }
 
@@ -1558,7 +1580,7 @@
 }
 
 // ==============================================================================
-// TAB 5: ✨ FUN & FX  — safe UIKit-only cosmetics + big combo chaos (never crashes)
+// SHARED HELPERS + ⚙️ PRO TAB (power/design features) + GUIDE
 // ==============================================================================
 - (UIView *)effectsHostView {
     UIView *v = self.floatingButton.superview;
@@ -1567,147 +1589,8 @@
     return v;
 }
 
-// Spawn a wave of falling emoji/characters. colorOrNil tints them (matrix/hacker).
-- (void)spawnFalling:(NSArray<NSString *> *)glyphs count:(NSInteger)count color:(UIColor *)colorOrNil bigFont:(BOOL)big {
-    @try {
-        UIView *host = [self effectsHostView];
-        if (!host || glyphs.count == 0) return;
-        CGFloat w = host.bounds.size.width;  if (w < 60) w = 390;
-        CGFloat h = host.bounds.size.height; if (h < 60) h = 800;
-        for (NSInteger i = 0; i < count; i++) {
-            NSString *g = glyphs[arc4random_uniform((uint32_t)glyphs.count)];
-            CGFloat startX = (CGFloat)arc4random_uniform((uint32_t)w);
-            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(startX, -44, 44, 44)];
-            lbl.text = g;
-            lbl.textAlignment = NSTextAlignmentCenter;
-            CGFloat fs = big ? (24.0 + arc4random_uniform(16)) : (16.0 + arc4random_uniform(10));
-            lbl.font = colorOrNil ? [UIFont monospacedSystemFontOfSize:fs weight:UIFontWeightBold]
-                                  : [UIFont systemFontOfSize:fs];
-            if (colorOrNil) lbl.textColor = colorOrNil;
-            lbl.layer.zPosition = 99999.0;
-            [host addSubview:lbl];
-            CGFloat dur = 2.0 + (CGFloat)arc4random_uniform(22) / 10.0;
-            CGFloat delay = (CGFloat)arc4random_uniform(12) / 20.0;
-            CGFloat endX = startX + ((CGFloat)arc4random_uniform(140) - 70.0);
-            [UIView animateWithDuration:dur delay:delay options:0 animations:^{
-                lbl.center = CGPointMake(endX, h + 60);
-                lbl.alpha = 0.45;
-            } completion:^(BOOL finished) { [lbl removeFromSuperview]; }];
-        }
-    } @catch (NSException *e) {}
-}
-
-- (void)confettiBlast {
-    [self fireHaptic];
-    [self spawnFalling:@[@"🎉", @"🎊", @"✨", @"💜", @"⚡", @"💫", @"🥳", @"🔥"] count:46 color:nil bigFont:YES];
-    [self showToast:@"🎉 Confetti blast!"];
-}
-
-- (void)moneyRain {
-    [self fireHaptic];
-    for (int wave = 0; wave < 5; wave++) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wave * 0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self spawnFalling:@[@"💵", @"💰", @"🤑", @"💸", @"🪙"] count:16 color:nil bigFont:YES];
-        });
-    }
-    [self showToast:@"💸 Make it rain!"];
-}
-
-- (void)snowTick {
-    if (!self.snowActive) return;
-    [self spawnFalling:@[@"❄️", @"❄", @"🌨️", @"✻"] count:3 color:nil bigFont:NO];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.55 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self snowTick]; });
-}
-
-- (void)toggleSnow:(UIButton *)sender {
-    [self fireHaptic];
-    self.snowActive = !self.snowActive;
-    [sender setTitle:(self.snowActive ? @"❄️ Snow Mode: ON" : @"❄️ Snow Mode: OFF") forState:UIControlStateNormal];
-    if (self.snowActive) { [self snowTick]; [self showToast:@"❄️ Let it snow"]; }
-}
-
-- (void)rainbowTick {
-    if (!self.rainbowActive || !self.floatingButton) return;
-    NSArray<UIColor *> *cols = @[
-        [UIColor colorWithRed:0.95 green:0.20 blue:0.25 alpha:0.98], [UIColor colorWithRed:0.98 green:0.55 blue:0.15 alpha:0.98],
-        [UIColor colorWithRed:0.98 green:0.85 blue:0.20 alpha:0.98], [UIColor colorWithRed:0.25 green:0.85 blue:0.40 alpha:0.98],
-        [UIColor colorWithRed:0.20 green:0.75 blue:0.95 alpha:0.98], [UIColor colorWithRed:0.45 green:0.35 blue:0.95 alpha:0.98],
-        [UIColor colorWithRed:0.80 green:0.30 blue:0.90 alpha:0.98]
-    ];
-    self.rainbowHueIndex = (self.rainbowHueIndex + 1) % (NSInteger)cols.count;
-    UIColor *c = cols[self.rainbowHueIndex];
-    [UIView animateWithDuration:0.45 animations:^{ self.floatingButton.backgroundColor = c; }];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self rainbowTick]; });
-}
-
-- (void)toggleRainbow:(UIButton *)sender {
-    [self fireHaptic];
-    self.rainbowActive = !self.rainbowActive;
-    [sender setTitle:(self.rainbowActive ? @"🌈 Rainbow Button: ON" : @"🌈 Rainbow Button: OFF") forState:UIControlStateNormal];
-    if (self.rainbowActive) { [self rainbowTick]; }
-    else { self.floatingButton.backgroundColor = [UIColor colorWithRed:0.48 green:0.18 blue:0.92 alpha:0.98]; }
-}
-
-- (void)hackerMode {
-    [self fireHaptic];
-    UIColor *green = [UIColor colorWithRed:0.1 green:0.95 blue:0.3 alpha:1.0];
-    NSArray *chars = @[@"0", @"1", @"ｱ", @"ﾃ", @"ﾂ", @"ﾔ", @"7", @"X", @"$", @"#", @"@", @"ﾊ", @"9", @"4"];
-    for (int wave = 0; wave < 6; wave++) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wave * 0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self spawnFalling:chars count:14 color:green bigFont:NO];
-        });
-    }
-    // "ACCESS GRANTED" banner
-    @try {
-        UIView *host = [self effectsHostView];
-        if (!host) return;
-        CGFloat w = host.bounds.size.width; if (w < 60) w = 390;
-        UILabel *banner = [[UILabel alloc] initWithFrame:CGRectMake((w - 300) / 2.0, host.bounds.size.height / 2.0 - 30, 300, 60)];
-        banner.text = @"⣿ ACCESS GRANTED ⣿";
-        banner.textAlignment = NSTextAlignmentCenter;
-        banner.textColor = green;
-        banner.font = [UIFont monospacedSystemFontOfSize:20 weight:UIFontWeightHeavy];
-        banner.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.82];
-        banner.layer.cornerRadius = 10; banner.clipsToBounds = YES; banner.layer.zPosition = 100001.0; banner.alpha = 0.0;
-        [host addSubview:banner];
-        [UIView animateWithDuration:0.25 animations:^{ banner.alpha = 1.0; } completion:^(BOOL f) {
-            [UIView animateWithDuration:0.4 delay:2.0 options:0 animations:^{ banner.alpha = 0.0; } completion:^(BOOL f2) { [banner removeFromSuperview]; }];
-        }];
-    } @catch (NSException *e) {}
-    [self showToast:@"🕶️ We're in."];
-}
-
-- (NSArray<UIColor *> *)themeAccents {
-    return @[
-        [UIColor colorWithRed:0.48 green:0.18 blue:0.92 alpha:1.0], // Purple
-        [UIColor colorWithRed:0.20 green:0.80 blue:0.45 alpha:1.0], // Green
-        [UIColor colorWithRed:0.90 green:0.20 blue:0.30 alpha:1.0], // Red
-        [UIColor colorWithRed:0.20 green:0.60 blue:0.95 alpha:1.0], // Blue
-        [UIColor colorWithRed:0.95 green:0.75 blue:0.20 alpha:1.0]  // Gold
-    ];
-}
-
-- (void)applyTheme:(NSInteger)idx {
-    @try {
-        NSArray<UIColor *> *accents = [self themeAccents];
-        if (idx < 0 || idx >= (NSInteger)accents.count) idx = 0;
-        UIColor *c = accents[idx];
-        [[NSUserDefaults standardUserDefaults] setInteger:idx forKey:@"rave_apex_theme"];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-        if (self.floatingButton && !self.rainbowActive) self.floatingButton.backgroundColor = c;
-        if (self.menuContainer) self.menuContainer.layer.borderColor = c.CGColor;
-        if (self.tabSelector) self.tabSelector.selectedSegmentTintColor = c;
-    } @catch (NSException *e) {}
-}
-
-- (void)themeChanged:(UISegmentedControl *)seg {
-    [self fireHaptic];
-    [self applyTheme:seg.selectedSegmentIndex];
-}
-
 - (void)nukeEverything {
     [self fireHaptic];
-    [self confettiBlast];
     @try { [self trollBeepBarrage]; } @catch (NSException *e) {}
     @try { [self chaosPoltergeist]; } @catch (NSException *e) {}
     @try { [self chaosMassMute]; } @catch (NSException *e) {}
@@ -1738,48 +1621,220 @@
     else { [self showToast:@"🤖 Auto-Chaos stopped"]; }
 }
 
-- (void)setupFunTab:(UIView *)view {
-    CGFloat y = 4;
+// ---- Menu theme (OLED blackout) ----------------------------------------------
+- (void)applyMenuTheme {
+    @try {
+        if (!self.menuContainer) return;
+        UIView *content = self.menuContainer.contentView;
+        UIView *oledBg = [content viewWithTag:4242];
+        if ([RaveApexConfig sharedConfig].oledBlackoutThemeEnabled) {
+            if (!oledBg) {
+                oledBg = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.menuContainer.bounds.size.width, self.menuContainer.bounds.size.height)];
+                oledBg.tag = 4242;
+                oledBg.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.97];
+                oledBg.userInteractionEnabled = NO;
+                [content insertSubview:oledBg atIndex:0];
+            }
+            self.menuContainer.layer.borderColor = [UIColor colorWithRed:0.2 green:0.9 blue:0.6 alpha:0.7].CGColor;
+        } else {
+            [oledBg removeFromSuperview];
+            self.menuContainer.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.18].CGColor;
+        }
+    } @catch (NSException *e) {}
+}
 
-    UILabel *hdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
-    hdr.text = @"Harmless, funny eye-candy — none of this touches the room.";
+// ---- Draggable menu (pan the header strip) -----------------------------------
+- (void)handleMenuDrag:(UIPanGestureRecognizer *)pan {
+    if (!self.menuContainer || !self.menuContainer.superview) return;
+    CGPoint t = [pan translationInView:self.menuContainer.superview];
+    if (pan.state == UIGestureRecognizerStateBegan) self.menuDragStart = self.menuContainer.center;
+    self.menuContainer.center = CGPointMake(self.menuDragStart.x + t.x, self.menuDragStart.y + t.y);
+}
+
+// ---- Tactical status pill (floating CPU/FPS chip) ----------------------------
+- (void)updateTacticalPillCPU:(float)cpu fps:(double)fps {
+    if (!self.tacticalPill || self.tacticalPill.hidden) return;
+    self.tacticalPill.text = [NSString stringWithFormat:@"⚡ %.0f%%  %.0f fps", cpu, fps];
+}
+
+- (void)toggleTacticalPill:(UIButton *)sender {
+    [self fireHaptic];
+    RaveApexConfig *c = [RaveApexConfig sharedConfig];
+    c.tacticalPillEnabled = !c.tacticalPillEnabled;
+    [c save];
+    [sender setTitle:(c.tacticalPillEnabled ? @"🏷️ Tactical Pill: ON" : @"🏷️ Tactical Pill: OFF") forState:UIControlStateNormal];
+    @try {
+        if (c.tacticalPillEnabled) {
+            UIView *host = [self effectsHostView];
+            if (!self.tacticalPill && host) {
+                self.tacticalPill = [[UILabel alloc] initWithFrame:CGRectMake(78, 150, 150, 26)];
+                self.tacticalPill.backgroundColor = [UIColor colorWithRed:0.08 green:0.08 blue:0.14 alpha:0.9];
+                self.tacticalPill.textColor = [UIColor colorWithRed:0.4 green:0.95 blue:0.65 alpha:1.0];
+                self.tacticalPill.font = [UIFont monospacedDigitSystemFontOfSize:11 weight:UIFontWeightBold];
+                self.tacticalPill.textAlignment = NSTextAlignmentCenter;
+                self.tacticalPill.text = @"⚡ --%  -- fps";
+                self.tacticalPill.layer.cornerRadius = 13; self.tacticalPill.clipsToBounds = YES;
+                self.tacticalPill.layer.zPosition = 9998.0;
+                [host addSubview:self.tacticalPill];
+            }
+            self.tacticalPill.hidden = NO;
+        } else {
+            self.tacticalPill.hidden = YES;
+        }
+    } @catch (NSException *e) {}
+}
+
+// ---- God Mode: flip the universally-good capabilities on in one tap ----------
+- (void)activateGodMode {
+    [self fireHaptic];
+    RaveApexConfig *c = [RaveApexConfig sharedConfig];
+    c.adBlockEnabled = YES; c.premiumBypassEnabled = YES; c.matureBypassEnabled = YES;
+    c.forcePiPEnabled = YES; c.highestRenditionLockEnabled = YES; c.uncappedSpeedEnabled = YES;
+    c.bufferOverdriveEnabled = YES; c.backgroundAudioEnabled = YES;
+    c.crownSpoofEnabled = YES; c.omniLeaderElevationEnabled = YES;
+    c.antiKickInterceptionEnabled = YES; c.kickReflectorEnabled = YES;
+    c.ghostPresenceEnabled = YES; c.autoRejoinEnabled = YES;
+    c.telemetryHUDEnabled = YES; c.cpuMonitoringEnabled = YES; c.pingSpoofEnabled = YES;
+    [c save];
+    [self showToast:@"🔱 GOD MODE: all core powers armed"];
+}
+
+// ---- Preset loadouts ---------------------------------------------------------
+- (void)applyPreset:(UISegmentedControl *)seg {
+    [self fireHaptic];
+    RaveApexConfig *c = [RaveApexConfig sharedConfig];
+    NSInteger p = seg.selectedSegmentIndex;
+    NSString *name = @"";
+    if (p == 0) { // Stealth
+        c.ghostPresenceEnabled = YES; c.stealthGhostListenerEnabled = YES; c.phantomIdentityCamouflageEnabled = YES;
+        c.antiKickInterceptionEnabled = YES; c.kickReflectorEnabled = YES; c.adBlockEnabled = YES;
+        c.crownSpoofEnabled = NO; c.omniLeaderElevationEnabled = NO;
+        name = @"🥷 Stealth";
+    } else if (p == 1) { // Chaos
+        c.omniLeaderElevationEnabled = YES; c.crownSpoofEnabled = YES; c.forceMicTransmissionEnabled = YES;
+        c.micLockAlwaysOn = YES; c.turboPreampEnabled = YES; c.audioPreampBoostEnabled = YES;
+        name = @"🔥 Chaos";
+    } else if (p == 2) { // Cinema
+        c.adBlockEnabled = YES; c.premiumBypassEnabled = YES; c.matureBypassEnabled = YES;
+        c.forcePiPEnabled = YES; c.highestRenditionLockEnabled = YES; c.bufferOverdriveEnabled = YES;
+        c.backgroundAudioEnabled = YES; c.voiceDuckingEnabled = YES;
+        name = @"🎬 Cinema";
+    } else { // Audiophile
+        c.audioPreampBoostEnabled = YES; c.dialogueEqEnabled = YES; c.voiceDuckingEnabled = YES;
+        c.dualStreamAudioBalanceEnabled = YES; c.backgroundAudioEnabled = YES;
+        name = @"🎧 Audiophile";
+    }
+    [c save];
+    [self showToast:[NSString stringWithFormat:@"%@ loadout applied", name]];
+}
+
+- (void)toggleOLED:(UIButton *)sender {
+    [self fireHaptic];
+    RaveApexConfig *c = [RaveApexConfig sharedConfig];
+    c.oledBlackoutThemeEnabled = !c.oledBlackoutThemeEnabled;
+    [c save];
+    [sender setTitle:(c.oledBlackoutThemeEnabled ? @"🖤 OLED Blackout: ON" : @"🖤 OLED Blackout: OFF") forState:UIControlStateNormal];
+    [self applyMenuTheme];
+}
+
+// ---- Menu size presets (rebuild live) ----------------------------------------
+- (void)menuSizeChanged:(UISegmentedControl *)seg {
+    [self fireHaptic];
+    [[NSUserDefaults standardUserDefaults] setInteger:seg.selectedSegmentIndex forKey:@"rave_apex_menu_size"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    @try {
+        [self.menuContainer removeFromSuperview];
+        self.menuContainer = nil;
+        self.isMenuOpen = NO;
+    } @catch (NSException *e) {}
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self toggleMenuVisibility];
+    });
+}
+
+// ---- Auto-Leader Guardian: re-assert the crown on a timer --------------------
+- (void)autoLeaderTick {
+    if (!self.autoLeaderActive) return;
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexCrownSeizureNotification" object:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self autoLeaderTick]; });
+}
+
+- (void)toggleAutoLeader:(UIButton *)sender {
+    [self fireHaptic];
+    self.autoLeaderActive = !self.autoLeaderActive;
+    [sender setTitle:(self.autoLeaderActive ? @"👑 Auto-Leader Guardian: ON" : @"👑 Auto-Leader Guardian: OFF") forState:UIControlStateNormal];
+    if (self.autoLeaderActive) { [self autoLeaderTick]; [self showToast:@"👑 Guarding leadership every 8s"]; }
+}
+
+// ---- Recon tools -------------------------------------------------------------
+- (void)participantXray {
+    [self fireHaptic];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexParticipantXrayNotification" object:nil];
+    [self showToast:@"🩻 Scanning room → Apex Log"];
+    [self showApexLog];
+}
+
+- (void)copyRoomInvite {
+    [self fireHaptic];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexCopyInviteNotification" object:nil];
+    [self showToast:@"🔗 Room info copied to clipboard"];
+}
+
+// ==============================================================================
+// ⚙️ PRO TAB — power loadouts, design controls, recon & big combos
+// ==============================================================================
+- (void)setupProTab:(UIView *)view {
+    CGFloat y = 4;
+    RaveApexConfig *c = [RaveApexConfig sharedConfig];
+
+    UILabel *hdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 30)];
+    hdr.text = @"One-tap loadouts, menu design, recon & combos.";
     hdr.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     hdr.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
     hdr.numberOfLines = 2;
-    [view addSubview:hdr]; y += 26;
+    [view addSubview:hdr]; y += 28;
 
-    [self trollButton:@"🎉 Confetti Blast" sub:@"Shower the screen with celebration emoji" y:y color:[UIColor colorWithRed:0.45 green:0.25 blue:0.7 alpha:0.92] action:@selector(confettiBlast) inView:view]; y += 50;
-    [self trollButton:@"💸 Make It Rain" sub:@"5 seconds of falling cash" y:y color:[UIColor colorWithRed:0.15 green:0.5 blue:0.3 alpha:0.92] action:@selector(moneyRain) inView:view]; y += 50;
-    [self trollButton:@"🕶️ Hacker Mode" sub:@"Matrix code rain + ACCESS GRANTED (pure show)" y:y color:[UIColor colorWithRed:0.08 green:0.35 blue:0.18 alpha:0.95] action:@selector(hackerMode) inView:view]; y += 50;
+    [self trollButton:@"🔱 ACTIVATE GOD MODE" sub:@"Arm every core power at once (adblock, premium, crown, anti-kick, HD…)" y:y color:[UIColor colorWithRed:0.55 green:0.4 blue:0.1 alpha:0.96] action:@selector(activateGodMode) inView:view]; y += 50;
 
-    UIButton *snowBtn = [self trollButton:@"❄️ Snow Mode: OFF" sub:@"Toggle a gentle, endless snowfall" y:y color:[UIColor colorWithRed:0.2 green:0.4 blue:0.6 alpha:0.9] action:@selector(toggleSnow:) inView:view]; y += 50;
-    (void)snowBtn;
-    UIButton *rbBtn = [self trollButton:@"🌈 Rainbow Button: OFF" sub:@"Cycle the floating button through rainbow colors" y:y color:[UIColor colorWithRed:0.5 green:0.25 blue:0.6 alpha:0.9] action:@selector(toggleRainbow:) inView:view]; y += 50;
-    (void)rbBtn;
+    UILabel *presetLbl = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    presetLbl.text = @"🎯 Preset Loadout";
+    presetLbl.textColor = [UIColor whiteColor];
+    presetLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [view addSubview:presetLbl]; y += 22;
+    UISegmentedControl *presetSeg = [[UISegmentedControl alloc] initWithItems:@[@"🥷 Stealth", @"🔥 Chaos", @"🎬 Cinema", @"🎧 Audio"]];
+    presetSeg.frame = CGRectMake(20, y, 300, 30);
+    presetSeg.momentary = YES;
+    [presetSeg setTitleTextAttributes:@{@"NSColor": [UIColor whiteColor], @"NSFont": [UIFont systemFontOfSize:10 weight:UIFontWeightBold]} forState:UIControlStateNormal];
+    [presetSeg addTarget:self action:@selector(applyPreset:) forControlEvents:UIControlEventValueChanged];
+    [view addSubview:presetSeg]; y += 42;
 
-    // Theme picker
-    UILabel *themeLbl = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
-    themeLbl.text = @"🎨 Menu Theme";
-    themeLbl.textColor = [UIColor whiteColor];
-    themeLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-    [view addSubview:themeLbl]; y += 22;
+    [self trollButton:(c.oledBlackoutThemeEnabled ? @"🖤 OLED Blackout: ON" : @"🖤 OLED Blackout: OFF") sub:@"Pure-black menu skin (saves battery on OLED)" y:y color:[UIColor colorWithRed:0.1 green:0.1 blue:0.12 alpha:0.95] action:@selector(toggleOLED:) inView:view]; y += 50;
 
-    UISegmentedControl *themeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Purple", @"Green", @"Red", @"Blue", @"Gold"]];
-    themeSeg.frame = CGRectMake(20, y, 300, 30);
-    themeSeg.selectedSegmentIndex = [[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_theme"];
-    [themeSeg setTitleTextAttributes:@{@"NSColor": [UIColor whiteColor], @"NSFont": [UIFont systemFontOfSize:10 weight:UIFontWeightBold]} forState:UIControlStateNormal];
-    [themeSeg addTarget:self action:@selector(themeChanged:) forControlEvents:UIControlEventValueChanged];
-    [view addSubview:themeSeg]; y += 42;
+    UILabel *sizeLbl = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    sizeLbl.text = @"📐 Menu Size";
+    sizeLbl.textColor = [UIColor whiteColor];
+    sizeLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [view addSubview:sizeLbl]; y += 22;
+    UISegmentedControl *sizeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Compact", @"Normal", @"Large"]];
+    sizeSeg.frame = CGRectMake(20, y, 300, 30);
+    sizeSeg.selectedSegmentIndex = [[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_menu_size"];
+    [sizeSeg setTitleTextAttributes:@{@"NSColor": [UIColor whiteColor], @"NSFont": [UIFont systemFontOfSize:10 weight:UIFontWeightBold]} forState:UIControlStateNormal];
+    [sizeSeg addTarget:self action:@selector(menuSizeChanged:) forControlEvents:UIControlEventValueChanged];
+    [view addSubview:sizeSeg]; y += 42;
 
-    UILabel *chaosHdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
-    chaosHdr.text = @"— Big combo buttons (these DO hit the room) —";
-    chaosHdr.textColor = [UIColor colorWithRed:0.9 green:0.5 blue:0.5 alpha:1.0];
-    chaosHdr.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
-    [view addSubview:chaosHdr]; y += 24;
+    [self trollButton:(c.tacticalPillEnabled ? @"🏷️ Tactical Pill: ON" : @"🏷️ Tactical Pill: OFF") sub:@"Floating CPU/FPS chip beside the ⚡ button" y:y color:[UIColor colorWithRed:0.15 green:0.3 blue:0.45 alpha:0.9] action:@selector(toggleTacticalPill:) inView:view]; y += 50;
+    [self trollButton:(self.autoLeaderActive ? @"👑 Auto-Leader Guardian: ON" : @"👑 Auto-Leader Guardian: OFF") sub:@"Re-seize the host crown automatically every 8s" y:y color:[UIColor colorWithRed:0.5 green:0.35 blue:0.1 alpha:0.9] action:@selector(toggleAutoLeader:) inView:view]; y += 50;
+    [self trollButton:@"🩻 Participant X-Ray" sub:@"Dump every user's name, ID & mute-state to the Apex Log" y:y color:[UIColor colorWithRed:0.2 green:0.45 blue:0.5 alpha:0.9] action:@selector(participantXray) inView:view]; y += 50;
+    [self trollButton:@"🔗 Copy Room Invite & Mesh ID" sub:@"Grab the current room link + mesh ID to clipboard" y:y color:[UIColor colorWithRed:0.25 green:0.4 blue:0.55 alpha:0.9] action:@selector(copyRoomInvite) inView:view]; y += 50;
 
-    [self trollButton:@"💣 NUKE EVERYTHING" sub:@"Fire beep spam + poltergeist + mute + desync + speed-rave at once" y:y color:[UIColor colorWithRed:0.75 green:0.1 blue:0.1 alpha:0.96] action:@selector(nukeEverything) inView:view]; y += 50;
-    UIButton *acBtn = [self trollButton:@"🤖 Auto-Chaos: OFF" sub:@"Auto-fire a random prank every ~12 seconds" y:y color:[UIColor colorWithRed:0.25 green:0.2 blue:0.4 alpha:0.9] action:@selector(toggleAutoChaos:) inView:view]; y += 50;
-    (void)acBtn;
+    UILabel *comboHdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    comboHdr.text = @"— Big combos (these hit the whole room) —";
+    comboHdr.textColor = [UIColor colorWithRed:0.9 green:0.5 blue:0.5 alpha:1.0];
+    comboHdr.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    [view addSubview:comboHdr]; y += 24;
+
+    [self trollButton:@"💣 NUKE EVERYTHING" sub:@"Beep spam + poltergeist + mute + desync + speed-rave at once" y:y color:[UIColor colorWithRed:0.75 green:0.1 blue:0.1 alpha:0.96] action:@selector(nukeEverything) inView:view]; y += 50;
+    [self trollButton:(self.autoChaosActive ? @"🤖 Auto-Chaos: ON" : @"🤖 Auto-Chaos: OFF") sub:@"Auto-fire a random prank every ~12 seconds" y:y color:[UIColor colorWithRed:0.25 green:0.2 blue:0.4 alpha:0.9] action:@selector(toggleAutoChaos:) inView:view]; y += 50;
 
     if ([view isKindOfClass:[UIScrollView class]]) ((UIScrollView *)view).contentSize = CGSizeMake(340, y + 20);
 }
@@ -1822,8 +1877,13 @@
     @"💥 TROLL  — pranks & power moves (affects the whole room)\n"
     @"Kick storms, mute sweeps, desync tornadoes, earrape preamp, speed-rave, ghost cloak, session ripper, and more. Use responsibly — everyone feels these.\n\n"
 
-    @"✨ FUN  — harmless eye-candy\n"
-    @"Confetti, money rain, snow, rainbow button, hacker mode, and themes. These are just for you and never touch the room. Plus big combo buttons (NUKE, Auto-Chaos) that DO hit the room.\n\n"
+    @"⚙️ PRO  — loadouts, design & recon\n"
+    @"• 🔱 God Mode: arm every core power in one tap.\n"
+    @"• 🎯 Presets: Stealth / Chaos / Cinema / Audiophile instant loadouts.\n"
+    @"• 🖤 OLED Blackout + 📐 Menu Size + 🏷️ Tactical Pill: make the menu yours.\n"
+    @"• 🩻 Participant X-Ray & 🔗 Copy Room Invite: recon the room.\n"
+    @"• 👑 Auto-Leader Guardian, 💣 NUKE, 🤖 Auto-Chaos: the big combos.\n"
+    @"Tip: drag the little grabber at the top of the menu to move it anywhere.\n\n"
 
     @"⚙️ NOTE ON ADVANCED FEATURES\n"
     @"The deepest host hooks (ad-block, premium, etc.) start OFF for safety. To arm them: Telem tab → 'Host Hooks' → turn ON, then fully close and reopen Rave. If anything misbehaves it auto-reverts after two launches. The menu, telemetry, pranks and Fun tab all work without it.";
@@ -2563,6 +2623,8 @@
         RaveApexConfig *c = [RaveApexConfig sharedConfig];
         double nudge = c.manualClockNudgeMs;
         float cpuPct = cpuFraction * 100.0f;
+
+        [self updateTacticalPillCPU:cpuPct fps:fps];
 
         if (self.telemetryLabel) {
             // Only the drift line is gated by the Sync Drift Monitor toggle; the live

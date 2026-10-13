@@ -1627,5 +1627,81 @@ static void rave_apex_master_init(void) {
         apex_trigger_room_freeze_strobe();
     }];
 
+    // Participant X-Ray: enumerate the room roster and dump to the Apex Log.
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexParticipantXrayNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            apex_log("[X-RAY] ==== ROOM PARTICIPANT SCAN ====");
+            int found = 0;
+            for (NSString *cn in @[@"_TtC4Rave11VoipManager", @"_TtC4Rave10RoomClient"]) {
+                Class cls = objc_getClass([cn UTF8String]);
+                if (!cls) continue;
+                id shared = [cls valueForKey:@"shared"];
+                if (!shared) continue;
+                for (NSString *k in @[@"participants", @"talkingUsers", @"users", @"members", @"peers"]) {
+                    id arr = nil;
+                    @try { arr = [shared valueForKey:k]; } @catch (NSException *e) { arr = nil; }
+                    if ([arr isKindOfClass:[NSArray class]] && [(NSArray *)arr count] > 0) {
+                        apex_log([[NSString stringWithFormat:@"[X-RAY] %@.%@ (%lu):", cn, k, (unsigned long)[(NSArray *)arr count]] UTF8String]);
+                        for (id u in (NSArray *)arr) {
+                            NSMutableString *line = [NSMutableString stringWithString:@"   • "];
+                            for (NSString *prop in @[@"displayName", @"name", @"username", @"userId", @"meshUserId", @"muted", @"micDisabled", @"isLeader"]) {
+                                @try {
+                                    id v = [u valueForKey:prop];
+                                    if (v) [line appendFormat:@"%@=%@  ", prop, v];
+                                } @catch (NSException *e) {}
+                            }
+                            apex_log([line UTF8String]);
+                            found++;
+                        }
+                    }
+                }
+            }
+            if (found == 0) apex_log("[X-RAY] No roster exposed (join a room first).");
+            apex_log("[X-RAY] ==== END SCAN ====");
+            [[RaveApexMenuUI sharedInstance] showToast:[NSString stringWithFormat:@"🩻 X-Ray: %d users logged", found]];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] X-Ray: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // Copy Room Invite & Mesh ID to clipboard.
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexCopyInviteNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            NSString *meshId = nil;
+            for (NSString *cn in @[@"_TtC4Rave10RoomClient", @"_TtC4Rave11VoipManager", @"_TtC4Rave12MeshSettings"]) {
+                Class cls = objc_getClass([cn UTF8String]);
+                if (!cls) continue;
+                id shared = [cls valueForKey:@"shared"];
+                if (!shared) continue;
+                for (NSString *k in @[@"meshId", @"currentMeshId", @"roomId", @"meshUserId"]) {
+                    @try {
+                        id v = [shared valueForKey:k];
+                        if (v && [[v description] length] > 0) { meshId = [v description]; break; }
+                    } @catch (NSException *e) {}
+                }
+                if (meshId) break;
+            }
+            if (!meshId) meshId = [RaveApexConfig sharedConfig].lastKnownMeshId;
+            NSString *payload = meshId && meshId.length > 0
+                ? [NSString stringWithFormat:@"https://rave.io/%@  (mesh: %@)", meshId, meshId]
+                : @"(no active room — join one first)";
+            Class pbCls = objc_getClass("UIPasteboard");
+            if (pbCls) {
+                id pb = [pbCls valueForKey:@"generalPasteboard"];
+                if (pb && [pb respondsToSelector:NSSelectorFromString(@"setString:")]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(pb, NSSelectorFromString(@"setString:"), payload);
+                }
+            }
+            apex_log([[NSString stringWithFormat:@"[INVITE] %@", payload] UTF8String]);
+            [[RaveApexMenuUI sharedInstance] showToast:(meshId.length > 0 ? @"🔗 Invite copied!" : @"⚠️ No active room")];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] CopyInvite: %@", e.reason] UTF8String]);
+        }
+    }];
+
     NSLog(@"[RaveApexCore] Master initialization complete. Zero startup hooks armed.");
 }
