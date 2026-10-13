@@ -1,0 +1,11 @@
+*.ipa
+*.dylib
+*.o
+build/
+extracted/
+.git/
+*.pdb
+*.lib
+kamohacks_all_strings.txt
+nul
+src/nul
