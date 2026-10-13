@@ -103,6 +103,15 @@
 @property (nonatomic, strong) UIView *logPanel;
 @property (nonatomic, strong) UITextView *logTextView;
 
+// Guide panel
+@property (nonatomic, strong) UIView *guidePanel;
+
+// Fun / cosmetic feature state
+@property (nonatomic, assign) BOOL snowActive;
+@property (nonatomic, assign) BOOL rainbowActive;
+@property (nonatomic, assign) BOOL autoChaosActive;
+@property (nonatomic, assign) NSInteger rainbowHueIndex;
+
 @end
 
 @implementation RaveApexMenuUI
@@ -740,14 +749,22 @@
     title.font = [UIFont systemFontOfSize:15.5 weight:UIFontWeightHeavy];
     [content addSubview:title];
 
-    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(20, 36, 300, 14)];
-    sub.text = @"Phase 8 Telemetry & Privilege Matrix (Hardened)";
+    UILabel *sub = [[UILabel alloc] initWithFrame:CGRectMake(20, 36, 260, 14)];
+    sub.text = @"Tap ❓ for a simple guide to everything";
     sub.textColor = [UIColor colorWithRed:0.7 green:0.45 blue:1.0 alpha:1.0];
     sub.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
     [content addSubview:sub];
 
-    // Segmented Tab Selector (5 Distinct Tabs)
-    NSArray *tabs = @[@"Roles", @"Audio", @"Media", @"Telem", @"Troll"];
+    // Header ❓ Guide button (top-right)
+    UIButton *guideBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    guideBtn.frame = CGRectMake(targetW - 46, 12, 34, 26);
+    [guideBtn setTitle:@"❓" forState:UIControlStateNormal];
+    guideBtn.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    [guideBtn addTarget:self action:@selector(showGuide) forControlEvents:UIControlEventTouchUpInside];
+    [content addSubview:guideBtn];
+
+    // Segmented Tab Selector (6 Distinct Tabs)
+    NSArray *tabs = @[@"Roles", @"Audio", @"Media", @"Telem", @"Troll", @"Fun"];
     self.tabSelector = [[UISegmentedControl alloc] initWithItems:tabs];
     self.tabSelector.frame = CGRectMake(14, 56, 312, 28);
     self.tabSelector.selectedSegmentIndex = 0;
@@ -757,15 +774,16 @@
     [self.tabSelector addTarget:self action:@selector(tabChanged:) forControlEvents:UIControlEventValueChanged];
     [content addSubview:self.tabSelector];
 
-    // Create 5 scrollable tab views (Roles / Audio / Media / Telemetry / Troll)
-    CGRect tabFrame = CGRectMake(0, 90, 340, 410);
+    // Create 6 scrollable tab views (Roles / Audio / Media / Telemetry / Troll / Fun)
+    CGRect tabFrame = CGRectMake(0, 90, targetW, targetH - 150);
     UIScrollView *roleView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *audioView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *mediaView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *telemetryView = [[UIScrollView alloc] initWithFrame:tabFrame];
     UIScrollView *trollView = [[UIScrollView alloc] initWithFrame:tabFrame];
+    UIScrollView *funView = [[UIScrollView alloc] initWithFrame:tabFrame];
 
-    for (UIScrollView *sv in @[roleView, audioView, mediaView, telemetryView, trollView]) {
+    for (UIScrollView *sv in @[roleView, audioView, mediaView, telemetryView, trollView, funView]) {
         sv.showsVerticalScrollIndicator = YES;
         sv.alwaysBounceVertical = YES;
     }
@@ -775,13 +793,15 @@
     [self setupMediaTab:mediaView];
     [self setupTelemetryTab:telemetryView];
     [self setupTrollTab:trollView];
+    [self setupFunTab:funView];
 
     audioView.hidden = YES;
     mediaView.hidden = YES;
     telemetryView.hidden = YES;
     trollView.hidden = YES;
+    funView.hidden = YES;
 
-    self.tabViews = @[roleView, audioView, mediaView, telemetryView, trollView];
+    self.tabViews = @[roleView, audioView, mediaView, telemetryView, trollView, funView];
     for (UIView *tv in self.tabViews) {
         [content addSubview:tv];
     }
@@ -798,6 +818,9 @@
     [content addSubview:self.telemetryLabel];
 
     [parentView addSubview:self.menuContainer];
+
+    // Apply the user's saved menu theme to the freshly-built surface.
+    [self applyTheme:[[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_theme"]];
   } @catch (NSException *e) {
     NSLog(@"[RaveApexCore] setupMenuContainerInView guarded exception: %@", e);
     // Discard any partially-built surface so toggleMenuVisibility's circuit breaker
@@ -1532,6 +1555,325 @@
     [self trollButton:@"🛡️ Emergency Panic Cloak" sub:@"Instant 0ms teardown of all overlay surfaces" y:y color:[UIColor colorWithRed:0.6 green:0.1 blue:0.1 alpha:0.9] action:@selector(panicHide) inView:view]; y += 50;
 
     if ([view isKindOfClass:[UIScrollView class]]) ((UIScrollView *)view).contentSize = CGSizeMake(340, y + 20);
+}
+
+// ==============================================================================
+// TAB 5: ✨ FUN & FX  — safe UIKit-only cosmetics + big combo chaos (never crashes)
+// ==============================================================================
+- (UIView *)effectsHostView {
+    UIView *v = self.floatingButton.superview;
+    if (!v) v = self.menuContainer.superview;
+    if (!v) v = self.menuContainer;
+    return v;
+}
+
+// Spawn a wave of falling emoji/characters. colorOrNil tints them (matrix/hacker).
+- (void)spawnFalling:(NSArray<NSString *> *)glyphs count:(NSInteger)count color:(UIColor *)colorOrNil bigFont:(BOOL)big {
+    @try {
+        UIView *host = [self effectsHostView];
+        if (!host || glyphs.count == 0) return;
+        CGFloat w = host.bounds.size.width;  if (w < 60) w = 390;
+        CGFloat h = host.bounds.size.height; if (h < 60) h = 800;
+        for (NSInteger i = 0; i < count; i++) {
+            NSString *g = glyphs[arc4random_uniform((uint32_t)glyphs.count)];
+            CGFloat startX = (CGFloat)arc4random_uniform((uint32_t)w);
+            UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(startX, -44, 44, 44)];
+            lbl.text = g;
+            lbl.textAlignment = NSTextAlignmentCenter;
+            CGFloat fs = big ? (24.0 + arc4random_uniform(16)) : (16.0 + arc4random_uniform(10));
+            lbl.font = colorOrNil ? [UIFont monospacedSystemFontOfSize:fs weight:UIFontWeightBold]
+                                  : [UIFont systemFontOfSize:fs];
+            if (colorOrNil) lbl.textColor = colorOrNil;
+            lbl.layer.zPosition = 99999.0;
+            [host addSubview:lbl];
+            CGFloat dur = 2.0 + (CGFloat)arc4random_uniform(22) / 10.0;
+            CGFloat delay = (CGFloat)arc4random_uniform(12) / 20.0;
+            CGFloat endX = startX + ((CGFloat)arc4random_uniform(140) - 70.0);
+            [UIView animateWithDuration:dur delay:delay options:0 animations:^{
+                lbl.center = CGPointMake(endX, h + 60);
+                lbl.alpha = 0.45;
+            } completion:^(BOOL finished) { [lbl removeFromSuperview]; }];
+        }
+    } @catch (NSException *e) {}
+}
+
+- (void)confettiBlast {
+    [self fireHaptic];
+    [self spawnFalling:@[@"🎉", @"🎊", @"✨", @"💜", @"⚡", @"💫", @"🥳", @"🔥"] count:46 color:nil bigFont:YES];
+    [self showToast:@"🎉 Confetti blast!"];
+}
+
+- (void)moneyRain {
+    [self fireHaptic];
+    for (int wave = 0; wave < 5; wave++) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wave * 0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self spawnFalling:@[@"💵", @"💰", @"🤑", @"💸", @"🪙"] count:16 color:nil bigFont:YES];
+        });
+    }
+    [self showToast:@"💸 Make it rain!"];
+}
+
+- (void)snowTick {
+    if (!self.snowActive) return;
+    [self spawnFalling:@[@"❄️", @"❄", @"🌨️", @"✻"] count:3 color:nil bigFont:NO];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.55 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self snowTick]; });
+}
+
+- (void)toggleSnow:(UIButton *)sender {
+    [self fireHaptic];
+    self.snowActive = !self.snowActive;
+    [sender setTitle:(self.snowActive ? @"❄️ Snow Mode: ON" : @"❄️ Snow Mode: OFF") forState:UIControlStateNormal];
+    if (self.snowActive) { [self snowTick]; [self showToast:@"❄️ Let it snow"]; }
+}
+
+- (void)rainbowTick {
+    if (!self.rainbowActive || !self.floatingButton) return;
+    NSArray<UIColor *> *cols = @[
+        [UIColor colorWithRed:0.95 green:0.20 blue:0.25 alpha:0.98], [UIColor colorWithRed:0.98 green:0.55 blue:0.15 alpha:0.98],
+        [UIColor colorWithRed:0.98 green:0.85 blue:0.20 alpha:0.98], [UIColor colorWithRed:0.25 green:0.85 blue:0.40 alpha:0.98],
+        [UIColor colorWithRed:0.20 green:0.75 blue:0.95 alpha:0.98], [UIColor colorWithRed:0.45 green:0.35 blue:0.95 alpha:0.98],
+        [UIColor colorWithRed:0.80 green:0.30 blue:0.90 alpha:0.98]
+    ];
+    self.rainbowHueIndex = (self.rainbowHueIndex + 1) % (NSInteger)cols.count;
+    UIColor *c = cols[self.rainbowHueIndex];
+    [UIView animateWithDuration:0.45 animations:^{ self.floatingButton.backgroundColor = c; }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self rainbowTick]; });
+}
+
+- (void)toggleRainbow:(UIButton *)sender {
+    [self fireHaptic];
+    self.rainbowActive = !self.rainbowActive;
+    [sender setTitle:(self.rainbowActive ? @"🌈 Rainbow Button: ON" : @"🌈 Rainbow Button: OFF") forState:UIControlStateNormal];
+    if (self.rainbowActive) { [self rainbowTick]; }
+    else { self.floatingButton.backgroundColor = [UIColor colorWithRed:0.48 green:0.18 blue:0.92 alpha:0.98]; }
+}
+
+- (void)hackerMode {
+    [self fireHaptic];
+    UIColor *green = [UIColor colorWithRed:0.1 green:0.95 blue:0.3 alpha:1.0];
+    NSArray *chars = @[@"0", @"1", @"ｱ", @"ﾃ", @"ﾂ", @"ﾔ", @"7", @"X", @"$", @"#", @"@", @"ﾊ", @"9", @"4"];
+    for (int wave = 0; wave < 6; wave++) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wave * 0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self spawnFalling:chars count:14 color:green bigFont:NO];
+        });
+    }
+    // "ACCESS GRANTED" banner
+    @try {
+        UIView *host = [self effectsHostView];
+        if (!host) return;
+        CGFloat w = host.bounds.size.width; if (w < 60) w = 390;
+        UILabel *banner = [[UILabel alloc] initWithFrame:CGRectMake((w - 300) / 2.0, host.bounds.size.height / 2.0 - 30, 300, 60)];
+        banner.text = @"⣿ ACCESS GRANTED ⣿";
+        banner.textAlignment = NSTextAlignmentCenter;
+        banner.textColor = green;
+        banner.font = [UIFont monospacedSystemFontOfSize:20 weight:UIFontWeightHeavy];
+        banner.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.82];
+        banner.layer.cornerRadius = 10; banner.clipsToBounds = YES; banner.layer.zPosition = 100001.0; banner.alpha = 0.0;
+        [host addSubview:banner];
+        [UIView animateWithDuration:0.25 animations:^{ banner.alpha = 1.0; } completion:^(BOOL f) {
+            [UIView animateWithDuration:0.4 delay:2.0 options:0 animations:^{ banner.alpha = 0.0; } completion:^(BOOL f2) { [banner removeFromSuperview]; }];
+        }];
+    } @catch (NSException *e) {}
+    [self showToast:@"🕶️ We're in."];
+}
+
+- (NSArray<UIColor *> *)themeAccents {
+    return @[
+        [UIColor colorWithRed:0.48 green:0.18 blue:0.92 alpha:1.0], // Purple
+        [UIColor colorWithRed:0.20 green:0.80 blue:0.45 alpha:1.0], // Green
+        [UIColor colorWithRed:0.90 green:0.20 blue:0.30 alpha:1.0], // Red
+        [UIColor colorWithRed:0.20 green:0.60 blue:0.95 alpha:1.0], // Blue
+        [UIColor colorWithRed:0.95 green:0.75 blue:0.20 alpha:1.0]  // Gold
+    ];
+}
+
+- (void)applyTheme:(NSInteger)idx {
+    @try {
+        NSArray<UIColor *> *accents = [self themeAccents];
+        if (idx < 0 || idx >= (NSInteger)accents.count) idx = 0;
+        UIColor *c = accents[idx];
+        [[NSUserDefaults standardUserDefaults] setInteger:idx forKey:@"rave_apex_theme"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        if (self.floatingButton && !self.rainbowActive) self.floatingButton.backgroundColor = c;
+        if (self.menuContainer) self.menuContainer.layer.borderColor = c.CGColor;
+        if (self.tabSelector) self.tabSelector.selectedSegmentTintColor = c;
+    } @catch (NSException *e) {}
+}
+
+- (void)themeChanged:(UISegmentedControl *)seg {
+    [self fireHaptic];
+    [self applyTheme:seg.selectedSegmentIndex];
+}
+
+- (void)nukeEverything {
+    [self fireHaptic];
+    [self confettiBlast];
+    @try { [self trollBeepBarrage]; } @catch (NSException *e) {}
+    @try { [self chaosPoltergeist]; } @catch (NSException *e) {}
+    @try { [self chaosMassMute]; } @catch (NSException *e) {}
+    @try { [self desyncTornado]; } @catch (NSException *e) {}
+    @try { [self chaosSpeedRave]; } @catch (NSException *e) {}
+    [self showToast:@"💣 TOTAL CHAOS UNLEASHED"];
+}
+
+- (void)autoChaosTick {
+    if (!self.autoChaosActive) return;
+    NSArray<NSString *> *sels = @[@"trollBeepBarrage", @"chaosPoltergeist", @"chaosMassMute", @"desyncTornado", @"chaosSpeedRave", @"trollChaosClock"];
+    NSString *selName = sels[arc4random_uniform((uint32_t)sels.count)];
+    SEL sel = NSSelectorFromString(selName);
+    if ([self respondsToSelector:sel]) {
+        @try { ((void (*)(id, SEL))objc_msgSend)(self, sel); } @catch (NSException *e) {}
+    }
+    double delay = 10.0 + (double)arc4random_uniform(6); // 10-15s
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self autoChaosTick]; });
+}
+
+- (void)toggleAutoChaos:(UIButton *)sender {
+    [self fireHaptic];
+    self.autoChaosActive = !self.autoChaosActive;
+    [sender setTitle:(self.autoChaosActive ? @"🤖 Auto-Chaos: ON (every ~12s)" : @"🤖 Auto-Chaos: OFF") forState:UIControlStateNormal];
+    sender.backgroundColor = self.autoChaosActive ? [UIColor colorWithRed:0.6 green:0.12 blue:0.12 alpha:0.95]
+                                                  : [UIColor colorWithRed:0.25 green:0.2 blue:0.4 alpha:0.9];
+    if (self.autoChaosActive) { [self autoChaosTick]; [self showToast:@"🤖 Auto-Chaos armed"]; }
+    else { [self showToast:@"🤖 Auto-Chaos stopped"]; }
+}
+
+- (void)setupFunTab:(UIView *)view {
+    CGFloat y = 4;
+
+    UILabel *hdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    hdr.text = @"Harmless, funny eye-candy — none of this touches the room.";
+    hdr.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
+    hdr.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
+    hdr.numberOfLines = 2;
+    [view addSubview:hdr]; y += 26;
+
+    [self trollButton:@"🎉 Confetti Blast" sub:@"Shower the screen with celebration emoji" y:y color:[UIColor colorWithRed:0.45 green:0.25 blue:0.7 alpha:0.92] action:@selector(confettiBlast) inView:view]; y += 50;
+    [self trollButton:@"💸 Make It Rain" sub:@"5 seconds of falling cash" y:y color:[UIColor colorWithRed:0.15 green:0.5 blue:0.3 alpha:0.92] action:@selector(moneyRain) inView:view]; y += 50;
+    [self trollButton:@"🕶️ Hacker Mode" sub:@"Matrix code rain + ACCESS GRANTED (pure show)" y:y color:[UIColor colorWithRed:0.08 green:0.35 blue:0.18 alpha:0.95] action:@selector(hackerMode) inView:view]; y += 50;
+
+    UIButton *snowBtn = [self trollButton:@"❄️ Snow Mode: OFF" sub:@"Toggle a gentle, endless snowfall" y:y color:[UIColor colorWithRed:0.2 green:0.4 blue:0.6 alpha:0.9] action:@selector(toggleSnow:) inView:view]; y += 50;
+    (void)snowBtn;
+    UIButton *rbBtn = [self trollButton:@"🌈 Rainbow Button: OFF" sub:@"Cycle the floating button through rainbow colors" y:y color:[UIColor colorWithRed:0.5 green:0.25 blue:0.6 alpha:0.9] action:@selector(toggleRainbow:) inView:view]; y += 50;
+    (void)rbBtn;
+
+    // Theme picker
+    UILabel *themeLbl = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    themeLbl.text = @"🎨 Menu Theme";
+    themeLbl.textColor = [UIColor whiteColor];
+    themeLbl.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [view addSubview:themeLbl]; y += 22;
+
+    UISegmentedControl *themeSeg = [[UISegmentedControl alloc] initWithItems:@[@"Purple", @"Green", @"Red", @"Blue", @"Gold"]];
+    themeSeg.frame = CGRectMake(20, y, 300, 30);
+    themeSeg.selectedSegmentIndex = [[NSUserDefaults standardUserDefaults] integerForKey:@"rave_apex_theme"];
+    [themeSeg setTitleTextAttributes:@{@"NSColor": [UIColor whiteColor], @"NSFont": [UIFont systemFontOfSize:10 weight:UIFontWeightBold]} forState:UIControlStateNormal];
+    [themeSeg addTarget:self action:@selector(themeChanged:) forControlEvents:UIControlEventValueChanged];
+    [view addSubview:themeSeg]; y += 42;
+
+    UILabel *chaosHdr = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 300, 16)];
+    chaosHdr.text = @"— Big combo buttons (these DO hit the room) —";
+    chaosHdr.textColor = [UIColor colorWithRed:0.9 green:0.5 blue:0.5 alpha:1.0];
+    chaosHdr.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    [view addSubview:chaosHdr]; y += 24;
+
+    [self trollButton:@"💣 NUKE EVERYTHING" sub:@"Fire beep spam + poltergeist + mute + desync + speed-rave at once" y:y color:[UIColor colorWithRed:0.75 green:0.1 blue:0.1 alpha:0.96] action:@selector(nukeEverything) inView:view]; y += 50;
+    UIButton *acBtn = [self trollButton:@"🤖 Auto-Chaos: OFF" sub:@"Auto-fire a random prank every ~12 seconds" y:y color:[UIColor colorWithRed:0.25 green:0.2 blue:0.4 alpha:0.9] action:@selector(toggleAutoChaos:) inView:view]; y += 50;
+    (void)acBtn;
+
+    if ([view isKindOfClass:[UIScrollView class]]) ((UIScrollView *)view).contentSize = CGSizeMake(340, y + 20);
+}
+
+// ==============================================================================
+// IN-APP GUIDE — plain-English explanation of every tab & feature
+// ==============================================================================
+- (NSString *)guideText {
+    return
+    @"⚡ RAVE APEX — QUICK GUIDE\n"
+    @"Tap the ⚡ button to open/close this menu. You can also SHAKE the phone, 2-finger double-tap, or swipe in from the right edge.\n"
+    @"Drag the ⚡ button anywhere. Most toggles take effect instantly; a few need the host feature running (see ⚙️ note at the end).\n\n"
+
+    @"🏷️ ROLES  — who's in charge of the room\n"
+    @"• Crown Badge Spoof: shows the leader crown on you.\n"
+    @"• Local Playback Authority / Free Desync: scrub & pause without the room yanking you back.\n"
+    @"• Anti-Kick / Kick Reflector: resist being removed, bounce it back.\n"
+    @"• Omni-Leader: unlock kick / transfer-crown on everyone.\n"
+    @"• Ghost Presence: be in the room without showing on the roster.\n\n"
+
+    @"🔊 AUDIO  — sound control\n"
+    @"• Preamp Boost + slider: make audio louder (up to extreme levels).\n"
+    @"• Continuous Mic: keep your mic open past push-to-talk.\n"
+    @"• Background Audio: keep sound playing when you leave the app or lock the screen.\n"
+    @"• EQ presets: Bass Boost, Vocal Clarity, Treble.\n\n"
+
+    @"🎬 MEDIA  — video & unlocks\n"
+    @"• Playback Speed + slider: 0.1x slow-mo to 10x hyper-speed.\n"
+    @"• Ad Block: kill the ad waterfall.\n"
+    @"• Premium Unlock / Mature Bypass: lift paywalls & rating prompts.\n"
+    @"• Force PiP: pop video into picture-in-picture.\n"
+    @"• HD Lock / Buffer Overdrive: force best quality + big forward buffer.\n\n"
+
+    @"📊 TELEM  — live stats & tools\n"
+    @"• Real CPU %, memory, FPS, and sync drift.\n"
+    @"• 📜 Apex Log: see exactly what loaded & fired (your proof it works).\n"
+    @"• 🧬 Dump Symbols: list the app's internals (advanced).\n"
+    @"• Panic Hide, Reset All, button emoji, and the Host-Hooks switch live here.\n\n"
+
+    @"💥 TROLL  — pranks & power moves (affects the whole room)\n"
+    @"Kick storms, mute sweeps, desync tornadoes, earrape preamp, speed-rave, ghost cloak, session ripper, and more. Use responsibly — everyone feels these.\n\n"
+
+    @"✨ FUN  — harmless eye-candy\n"
+    @"Confetti, money rain, snow, rainbow button, hacker mode, and themes. These are just for you and never touch the room. Plus big combo buttons (NUKE, Auto-Chaos) that DO hit the room.\n\n"
+
+    @"⚙️ NOTE ON ADVANCED FEATURES\n"
+    @"The deepest host hooks (ad-block, premium, etc.) start OFF for safety. To arm them: Telem tab → 'Host Hooks' → turn ON, then fully close and reopen Rave. If anything misbehaves it auto-reverts after two launches. The menu, telemetry, pranks and Fun tab all work without it.";
+}
+
+- (void)showGuide {
+    [self fireHaptic];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            UIView *parent = [self effectsHostView];
+            if (!parent) return;
+            if (self.guidePanel) { [self.guidePanel removeFromSuperview]; self.guidePanel = nil; }
+
+            CGFloat pw = MIN(parent.bounds.size.width - 24, 360); if (pw < 260) pw = 320;
+            CGFloat ph = MIN(parent.bounds.size.height - 150, 520); if (ph < 320) ph = 460;
+            UIView *panel = [[UIView alloc] initWithFrame:CGRectMake((parent.bounds.size.width - pw) / 2.0, 80, pw, ph)];
+            panel.backgroundColor = [UIColor colorWithRed:0.05 green:0.05 blue:0.09 alpha:0.98];
+            panel.layer.cornerRadius = 16;
+            panel.layer.borderColor = [UIColor colorWithRed:0.55 green:0.3 blue:1.0 alpha:0.8].CGColor;
+            panel.layer.borderWidth = 1.2; panel.clipsToBounds = YES; panel.layer.zPosition = 100002.0;
+
+            UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(14, 10, pw - 70, 22)];
+            title.text = @"❓ How everything works";
+            title.textColor = [UIColor whiteColor];
+            title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightHeavy];
+            [panel addSubview:title];
+
+            UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
+            close.frame = CGRectMake(pw - 48, 8, 40, 26);
+            [close setTitle:@"✕" forState:UIControlStateNormal];
+            close.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
+            [close addTarget:self action:@selector(hideGuide) forControlEvents:UIControlEventTouchUpInside];
+            [panel addSubview:close];
+
+            UITextView *tv = [[UITextView alloc] initWithFrame:CGRectMake(8, 38, pw - 16, ph - 46)];
+            tv.editable = NO;
+            tv.backgroundColor = [UIColor clearColor];
+            tv.textColor = [UIColor colorWithRed:0.86 green:0.88 blue:0.95 alpha:1.0];
+            tv.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+            tv.text = [self guideText];
+            [panel addSubview:tv];
+
+            [parent addSubview:panel];
+            self.guidePanel = panel;
+        } @catch (NSException *e) {}
+    });
+}
+
+- (void)hideGuide {
+    if (self.guidePanel) { [self.guidePanel removeFromSuperview]; self.guidePanel = nil; }
 }
 
 - (void)triggerMegaPreamp {
