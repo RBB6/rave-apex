@@ -48,6 +48,19 @@ void apex_enforce_hd_quality(id _Nullable videoPlayer);
 // from the dylib constructor (UIKit is already resident at load time).
 void install_ui_lifecycle_hooks(void);
 
+// Idempotently install all verified host-app feature hooks (can be called live
+// from the menu toggle or during startup).
+void install_host_feature_hooks(void);
+
+// Safe runtime ivar & live object discovery (works on non-@objc Swift stored properties)
+id _Nullable apex_safe_ivar_object(id _Nullable obj, const char *ivarName);
+void apex_safe_set_ivar_bool(id _Nullable obj, const char *ivarName, BOOL val);
+id _Nullable apex_find_active_mesh_vc(void);
+id _Nullable apex_find_active_voip_manager(void);
+id _Nullable apex_find_active_room_client(void);
+NSArray *apex_find_views_of_class(const char *className);
+void apex_play_synth_tone(double freqHz, double durationSec, float volume);
+
 // Active VideoPlayer & AVPlayer discovery and rate/seek/PiP control
 id _Nullable apex_find_active_video_player(void);
 id _Nullable apex_find_av_player(id _Nullable videoPlayer);
@@ -85,3 +98,4 @@ void apex_trigger_eviction_reflector_2(void);
 void apex_trigger_room_freeze_strobe(void);
 
 NS_ASSUME_NONNULL_END
+

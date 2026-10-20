@@ -68,7 +68,9 @@ static int apex_sig_is_void_bool(const char *sig) {
 }
 
 // A hookable completion method returns void and ends in a block arg. Sets:
-//   *shape = 1 for (self,_cmd,completion), 2 for (self,_cmd,object,completion).
+//   *shape = 1 for (self,_cmd,completion),
+//   *shape = 2 for (self,_cmd,object,completion),
+//   *shape = 3 for (self,_cmd,object,object,completion).
 // Returns 1 if forwardable, 0 otherwise (unknown/primitive leading arg, etc.).
 static int apex_completion_shape(const char *te, int *shape) {
     char t[24];
@@ -77,6 +79,7 @@ static int apex_completion_shape(const char *te, int *shape) {
     if (t[n - 1] != '@') return 0;          // last arg must be the block (@?)
     if (n == 4) { if (shape) *shape = 1; return 1; }                 // ret,self,cmd,block
     if (n == 5) { if (t[3] != '@') return 0; if (shape) *shape = 2; return 1; } // +object
+    if (n == 6) { if (t[3] != '@' || t[4] != '@') return 0; if (shape) *shape = 3; return 1; } // +2 objects
     return 0;
 }
 

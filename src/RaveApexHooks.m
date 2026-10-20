@@ -5,13 +5,280 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #include <mach/mach.h>
+#include <dlfcn.h>
+#include <math.h>
 #include <string.h>
 #include <time.h>
 
 // ==============================================================================
-// 0. GENERIC GUARDED SWIZZLE PRIMITIVE
+// 0. GENERIC GUARDED SWIZZLE PRIMITIVE & SAFE SWIFT IVAR ACCESSORS
 // ==============================================================================
-//
+static id g_live_voip_manager = nil;
+static id g_live_room_client = nil;
+static id g_live_synth_player = nil;
+
+typedef void *ApexIvar;
+typedef ApexIvar (*apex_class_getInstanceVariable_fn)(Class, const char *);
+typedef id (*apex_object_getIvar_fn)(id, ApexIvar);
+typedef ptrdiff_t (*apex_ivar_getOffset_fn)(ApexIvar);
+
+static apex_class_getInstanceVariable_fn g_fn_getIvar = NULL;
+static apex_object_getIvar_fn g_fn_objGetIvar = NULL;
+static apex_ivar_getOffset_fn g_fn_ivarGetOffset = NULL;
+
+static void apex_resolve_ivar_runtime(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        void *h = (void *)-2; // RTLD_DEFAULT
+        g_fn_getIvar = (apex_class_getInstanceVariable_fn)dlsym(h, "class_getInstanceVariable");
+        g_fn_objGetIvar = (apex_object_getIvar_fn)dlsym(h, "object_getIvar");
+        g_fn_ivarGetOffset = (apex_ivar_getOffset_fn)dlsym(h, "ivar_getOffset");
+    });
+}
+
+id _Nullable apex_safe_ivar_object(id _Nullable obj, const char *ivarName) {
+    if (!obj || !ivarName) return nil;
+    @try {
+        NSString *key = [NSString stringWithUTF8String:ivarName];
+        if (key) {
+            SEL getter = NSSelectorFromString(key);
+            if ([obj respondsToSelector:getter]) {
+                return ((id (*)(id, SEL))objc_msgSend)(obj, getter);
+            }
+        }
+        apex_resolve_ivar_runtime();
+        if (g_fn_getIvar && g_fn_objGetIvar) {
+            Class cls = object_getClass(obj);
+            ApexIvar iv = cls ? g_fn_getIvar(cls, ivarName) : NULL;
+            if (iv) {
+                return g_fn_objGetIvar(obj, iv);
+            }
+        }
+    } @catch (NSException *e) {
+        // Guarded fallback for non-KVC Swift properties
+    }
+    return nil;
+}
+
+void apex_safe_set_ivar_bool(id _Nullable obj, const char *ivarName, BOOL val) {
+    if (!obj || !ivarName) return;
+    @try {
+        apex_resolve_ivar_runtime();
+        if (g_fn_getIvar && g_fn_ivarGetOffset) {
+            Class cls = object_getClass(obj);
+            ApexIvar iv = cls ? g_fn_getIvar(cls, ivarName) : NULL;
+            if (iv) {
+                ptrdiff_t off = g_fn_ivarGetOffset(iv);
+                if (off > 0) {
+                    uint8_t *base = (uint8_t *)((__bridge void *)obj);
+                    base[off] = val ? 1 : 0;
+                }
+            }
+        }
+    } @catch (NSException *e) {
+        // Guarded fallback
+    }
+}
+
+static id find_vc_of_class_recursive(UIViewController *vc, Class targetCls) {
+    if (!vc || !targetCls) return nil;
+    if ([vc isKindOfClass:targetCls]) return vc;
+    SEL presSel = NSSelectorFromString(@"presentedViewController");
+    if ([vc respondsToSelector:presSel]) {
+        UIViewController *pres = ((id (*)(id, SEL))objc_msgSend)(vc, presSel);
+        if (pres && pres != vc) {
+            id found = find_vc_of_class_recursive(pres, targetCls);
+            if (found) return found;
+        }
+    }
+    SEL childSel = NSSelectorFromString(@"childViewControllers");
+    if ([vc respondsToSelector:childSel]) {
+        NSArray *children = [((NSArray * (*)(id, SEL))objc_msgSend)(vc, childSel) copy];
+        for (UIViewController *child in children) {
+            id found = find_vc_of_class_recursive(child, targetCls);
+            if (found) return found;
+        }
+    }
+    return nil;
+}
+
+id _Nullable apex_find_active_mesh_vc(void) {
+    Class meshCls = objc_getClass("_TtC4Rave4Mesh");
+    if (!meshCls) return nil;
+    @try {
+        NSArray<UIWindow *> *wins = [[UIApplication sharedApplication].windows copy];
+        for (UIWindow *w in wins) {
+            if (w.rootViewController) {
+                id found = find_vc_of_class_recursive(w.rootViewController, meshCls);
+                if (found) return found;
+            }
+        }
+    } @catch (NSException *e) {
+        // Ignore window traversal exceptions
+    }
+    return nil;
+}
+
+id _Nullable apex_find_active_voip_manager(void) {
+    id meshVC = apex_find_active_mesh_vc();
+    if (meshVC) {
+        id vm = apex_safe_ivar_object(meshVC, "voipManager");
+        if (vm) {
+            g_live_voip_manager = vm;
+            return vm;
+        }
+    }
+    if (g_live_voip_manager) return g_live_voip_manager;
+    Class voipCls = objc_getClass("_TtC4Rave11VoipManager");
+    if (voipCls && [voipCls respondsToSelector:NSSelectorFromString(@"shared")]) {
+        return ((id (*)(id, SEL))objc_msgSend)(voipCls, NSSelectorFromString(@"shared"));
+    }
+    return nil;
+}
+
+id _Nullable apex_find_active_room_client(void) {
+    id vm = apex_find_active_voip_manager();
+    if (vm) {
+        id rc = apex_safe_ivar_object(vm, "roomClient");
+        if (rc) {
+            g_live_room_client = rc;
+            return rc;
+        }
+    }
+    id meshVC = apex_find_active_mesh_vc();
+    if (meshVC) {
+        id rc = apex_safe_ivar_object(meshVC, "roomClient");
+        if (rc) {
+            g_live_room_client = rc;
+            return rc;
+        }
+    }
+    if (g_live_room_client) return g_live_room_client;
+    Class roomCls = objc_getClass("_TtC4Rave10RoomClient");
+    if (roomCls && [roomCls respondsToSelector:NSSelectorFromString(@"shared")]) {
+        return ((id (*)(id, SEL))objc_msgSend)(roomCls, NSSelectorFromString(@"shared"));
+    }
+    return nil;
+}
+
+static void collect_views_of_class_recursive(UIView *view, Class targetCls, NSMutableArray *outArr) {
+    if (!view || !targetCls || !outArr) return;
+    if ([view isKindOfClass:targetCls]) {
+        [outArr addObject:view];
+    }
+    NSArray<UIView *> *subs = [view.subviews copy];
+    for (UIView *sub in subs) {
+        collect_views_of_class_recursive(sub, targetCls, outArr);
+    }
+}
+
+NSArray *apex_find_views_of_class(const char *className) {
+    NSMutableArray *result = [NSMutableArray array];
+    if (!className) return result;
+    Class targetCls = objc_getClass(className);
+    if (!targetCls) return result;
+    @try {
+        if (@available(iOS 13.0, *)) {
+            NSSet<UIScene *> *scenes = [[UIApplication sharedApplication].connectedScenes copy];
+            for (UIScene *scene in scenes) {
+                if ([scene isKindOfClass:[UIWindowScene class]]) {
+                    NSArray<UIWindow *> *wins = [((UIWindowScene *)scene).windows copy];
+                    for (UIWindow *w in wins) {
+                        collect_views_of_class_recursive(w, targetCls, result);
+                    }
+                }
+            }
+        }
+        NSArray<UIWindow *> *allWins = [[UIApplication sharedApplication].windows copy];
+        for (UIWindow *w in allWins) {
+            collect_views_of_class_recursive(w, targetCls, result);
+        }
+    } @catch (NSException *e) {
+        // Ignore view traversal exceptions
+    }
+    return result;
+}
+
+void apex_play_synth_tone(double freqHz, double durationSec, float volume) {
+    if (freqHz < 40.0) freqHz = 440.0;
+    if (durationSec < 0.03) durationSec = 0.08;
+    if (durationSec > 3.0) durationSec = 3.0;
+    if (volume < 0.05f) volume = 0.5f;
+    if (volume > 1.0f) volume = 1.0f;
+    @try {
+        uint32_t sampleRate = 22050;
+        uint32_t numSamples = (uint32_t)(sampleRate * durationSec);
+        uint32_t dataBytes = numSamples * 2;
+        uint32_t totalBytes = 44 + dataBytes;
+        uint8_t *p = (uint8_t *)calloc(1, totalBytes);
+        if (!p) return;
+        memcpy(p + 0, "RIFF", 4);
+        uint32_t chunkSize = totalBytes - 8;
+        memcpy(p + 4, &chunkSize, 4);
+        memcpy(p + 8, "WAVEfmt ", 8);
+        uint32_t fmtSize = 16;
+        uint16_t audioFormat = 1; // PCM
+        uint16_t numChannels = 1;
+        uint32_t byteRate = sampleRate * 2;
+        uint16_t blockAlign = 2;
+        uint16_t bitsPerSample = 16;
+        memcpy(p + 16, &fmtSize, 4);
+        memcpy(p + 20, &audioFormat, 2);
+        memcpy(p + 22, &numChannels, 2);
+        memcpy(p + 24, &sampleRate, 4);
+        memcpy(p + 28, &byteRate, 4);
+        memcpy(p + 32, &blockAlign, 2);
+        memcpy(p + 34, &bitsPerSample, 2);
+        memcpy(p + 36, "data", 4);
+        memcpy(p + 40, &dataBytes, 4);
+
+        int16_t *samples = (int16_t *)(p + 44);
+        for (uint32_t i = 0; i < numSamples; i++) {
+            double t = (double)i / (double)sampleRate;
+            double env = 1.0;
+            if (i < 220) env = (double)i / 220.0;
+            else if (i > numSamples - 440 && numSamples > 440) env = (double)(numSamples - i) / 440.0;
+            double wave = sin(2.0 * 3.14159265358979323846 * freqHz * t) +
+                          0.35 * sin(2.0 * 3.14159265358979323846 * (freqHz * 2.0) * t);
+            double val = wave * 0.70 * env * 32767.0;
+            if (val > 32767.0) val = 32767.0;
+            if (val < -32767.0) val = -32767.0;
+            samples[i] = (int16_t)val;
+        }
+
+        Class dataCls = objc_getClass("NSData");
+        id wav = nil;
+        if (dataCls && [dataCls respondsToSelector:NSSelectorFromString(@"dataWithBytes:length:")]) {
+            wav = ((id (*)(id, SEL, const void *, NSUInteger))objc_msgSend)(dataCls, NSSelectorFromString(@"dataWithBytes:length:"), p, (NSUInteger)totalBytes);
+        }
+        free(p);
+        if (!wav) return;
+
+        Class avAudioCls = objc_getClass("AVAudioPlayer");
+        if (avAudioCls) {
+            SEL initSel = NSSelectorFromString(@"initWithData:error:");
+            id player = [avAudioCls alloc];
+            if (player && [player respondsToSelector:initSel]) {
+                player = ((id (*)(id, SEL, id, id *))objc_msgSend)(player, initSel, wav, NULL);
+                if (player) {
+                    g_live_synth_player = player;
+                    if ([player respondsToSelector:NSSelectorFromString(@"setVolume:")]) {
+                        ((void (*)(id, SEL, float))objc_msgSend)(player, NSSelectorFromString(@"setVolume:"), volume);
+                    }
+                    if ([player respondsToSelector:NSSelectorFromString(@"prepareToPlay")]) {
+                        ((BOOL (*)(id, SEL))objc_msgSend)(player, NSSelectorFromString(@"prepareToPlay"));
+                    }
+                    if ([player respondsToSelector:NSSelectorFromString(@"play")]) {
+                        ((BOOL (*)(id, SEL))objc_msgSend)(player, NSSelectorFromString(@"play"));
+                    }
+                }
+            }
+        }
+    } @catch (NSException *e) {
+        // Guarded audio synth fallback
+    }
+}
+
 // Replaces an instance method's IMP and hands back the original through
 // `origStore` so the hook can chain. Returns NO (and touches nothing) when the
 // class or selector is absent — i.e. the host symbol was stripped or renamed.
@@ -23,8 +290,9 @@ static BOOL apex_swizzle(const char *className, SEL sel, IMP replacement, IMP *o
     if (!m) return NO;
     const char *types = method_getTypeEncoding(m);
     if (!types) types = "v@:";
+    IMP currentImp = method_getImplementation(m);
+    if (origStore) *origStore = currentImp;
     if (class_addMethod(cls, sel, replacement, types)) {
-        if (origStore) *origStore = method_getImplementation(m);
         return YES;
     }
     // Only overwrite implementation if this method is directly implemented on cls,
@@ -42,11 +310,10 @@ static BOOL apex_swizzle(const char *className, SEL sel, IMP replacement, IMP *o
         free(methods);
     }
     if (isDeclaredOnClass) {
-        IMP original = method_getImplementation(m);
-        if (origStore) *origStore = original;
         method_setImplementation(m, replacement);
         return YES;
     }
+    if (origStore) *origStore = NULL;
     return NO;
 }
 
@@ -59,8 +326,9 @@ static BOOL apex_swizzle_class_method(const char *className, SEL sel, IMP replac
     if (!m) return NO;
     const char *types = method_getTypeEncoding(m);
     if (!types) types = "v@:";
+    IMP currentImp = method_getImplementation(m);
+    if (origStore) *origStore = currentImp;
     if (class_addMethod(meta, sel, replacement, types)) {
-        if (origStore) *origStore = method_getImplementation(m);
         return YES;
     }
     unsigned int count = 0;
@@ -76,11 +344,10 @@ static BOOL apex_swizzle_class_method(const char *className, SEL sel, IMP replac
         free(methods);
     }
     if (isDeclaredOnMeta) {
-        IMP original = method_getImplementation(m);
-        if (origStore) *origStore = original;
         method_setImplementation(m, replacement);
         return YES;
     }
+    if (origStore) *origStore = NULL;
     return NO;
 }
 
@@ -124,6 +391,13 @@ NSArray<NSString *> *apex_log_lines(void) {
 static void apex_dual_stream_apply(id videoPlayer);   // independent media gain
 static void apex_vote_autopilot_fire(void);           // affirmative ballot on transition
 
+typedef struct {
+    int64_t value;
+    int32_t timescale;
+    uint32_t flags;
+    int64_t epoch;
+} ApexCMTime;
+
 // ==============================================================================
 // 1. ENFORCEMENT HOOKS (each gated on a live config flag, each chains the orig)
 // ==============================================================================
@@ -131,8 +405,9 @@ static void apex_vote_autopilot_fire(void);           // affirmative ballot on t
 // --- Ad Waterfall Annihilator: safe pass-through (Swift ABI compliant) ---
 static IMP g_orig_waterfall = NULL;
 static id apex_waterfall(id self, SEL _cmd) {
+    if (CFG().adBlockEnabled) return apex_empty_array();
     if (g_orig_waterfall) return ((id (*)(id, SEL))g_orig_waterfall)(self, _cmd);
-    return nil;
+    return apex_empty_array();
 }
 
 // --- Universal Premium Unlock: force every provider to read as premium --------
@@ -179,9 +454,9 @@ static void apex_contextMenu_transferLeadership(id self, SEL _cmd) {
 }
 
 static IMP g_orig_contextMenu_muteOrUnmute = NULL;
-static void apex_contextMenu_muteOrUnmute(id self, SEL _cmd, BOOL mute) {
-    APEXLOG(@"[VoipUserContextMenu] muteOrUnmute:%d action intercepted.", mute);
-    if (g_orig_contextMenu_muteOrUnmute) ((void (*)(id, SEL, BOOL))g_orig_contextMenu_muteOrUnmute)(self, _cmd, mute);
+static void apex_contextMenu_muteOrUnmute(id self, SEL _cmd) {
+    APEXLOG(@"[VoipUserContextMenu] muteOrUnmute action intercepted.");
+    if (g_orig_contextMenu_muteOrUnmute) ((void (*)(id, SEL))g_orig_contextMenu_muteOrUnmute)(self, _cmd);
 }
 
 static IMP g_orig_contextMenu_setMicEnabled = NULL;
@@ -209,10 +484,15 @@ static void apex_participant_transferLeadership(id self, SEL _cmd) {
 // --- Metaclass Audio Preamp: +[AudioProcessor setPreferredVolume:] & setEnabled: ---
 static IMP g_orig_setPreferredVolume = NULL;
 static void apex_setPreferredVolume(id self, SEL _cmd, float volume) {
+    if (isnan(volume) || isinf(volume)) volume = 1.0f;
     RaveApexConfig *c = CFG();
-    if (c.audioPreampBoostEnabled || c.megaPreamp25xEnabled) {
+    if (c.audioPreampBoostEnabled || c.turboPreampEnabled || c.megaPreamp25xEnabled || c.megaPreamp30xEnabled) {
         float desired = (float)c.audioPreampVolume;
-        if (desired > 25.0f) desired = 25.0f;
+        if (isnan(desired) || isinf(desired) || desired < 1.0f) desired = 1.0f;
+        if (c.megaPreamp30xEnabled && desired < 30.0f) desired = 30.0f;
+        else if (c.megaPreamp25xEnabled && desired < 25.0f) desired = 25.0f;
+        else if (c.turboPreampEnabled && desired < 15.0f) desired = 15.0f;
+        if (desired > 30.0f) desired = 30.0f;
         if (volume < desired) volume = desired; // Clamp against host resets
     }
     if (g_orig_setPreferredVolume) ((void (*)(id, SEL, float))g_orig_setPreferredVolume)(self, _cmd, volume);
@@ -221,7 +501,7 @@ static void apex_setPreferredVolume(id self, SEL _cmd, float volume) {
 static IMP g_orig_setEnabled = NULL;
 static void apex_setEnabled(id self, SEL _cmd, BOOL enabled) {
     RaveApexConfig *c = CFG();
-    if (c.audioPreampBoostEnabled || c.megaPreamp25xEnabled) enabled = YES;
+    if (c.audioPreampBoostEnabled || c.turboPreampEnabled || c.megaPreamp25xEnabled || c.megaPreamp30xEnabled) enabled = YES;
     if (g_orig_setEnabled) ((void (*)(id, SEL, BOOL))g_orig_setEnabled)(self, _cmd, enabled);
 }
 
@@ -271,7 +551,8 @@ static double apex_syncOffset(id self, SEL _cmd) {
 static id find_active_video_player_in_subviews(UIView *view, Class vpClass) {
     if (!view) return nil;
     if ([view isKindOfClass:vpClass]) return view;
-    for (UIView *sub in view.subviews) {
+    NSArray<UIView *> *subs = [view.subviews copy];
+    for (UIView *sub in subs) {
         id found = find_active_video_player_in_subviews(sub, vpClass);
         if (found) return found;
     }
@@ -279,14 +560,17 @@ static id find_active_video_player_in_subviews(UIView *view, Class vpClass) {
 }
 
 id find_active_video_player(void) {
+    if (![NSThread isMainThread]) return nil;
     Class vpClass = objc_getClass("_TtC4Rave11VideoPlayer");
     if (!vpClass) return nil;
     @try {
         if (@available(iOS 13.0, *)) {
-            for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            NSSet<UIScene *> *scenes = [[UIApplication sharedApplication].connectedScenes copy];
+            for (UIScene *scene in scenes) {
                 if ([scene isKindOfClass:[UIWindowScene class]] &&
                     ((UIWindowScene *)scene).activationState == UISceneActivationStateForegroundActive) {
-                    for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+                    NSArray<UIWindow *> *wins = [((UIWindowScene *)scene).windows copy];
+                    for (UIWindow *w in wins) {
                         id found = find_active_video_player_in_subviews(w, vpClass);
                         if (found) return found;
                     }
@@ -298,7 +582,8 @@ id find_active_video_player(void) {
             id found = find_active_video_player_in_subviews(keyWin, vpClass);
             if (found) return found;
         }
-        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+        NSArray<UIWindow *> *allWins = [[UIApplication sharedApplication].windows copy];
+        for (UIWindow *w in allWins) {
             id found = find_active_video_player_in_subviews(w, vpClass);
             if (found) return found;
         }
@@ -310,28 +595,32 @@ id find_active_video_player(void) {
 
 id get_avplayer_from_video_player(id vp) {
     if (!vp) return nil;
-    id layer = nil;
-    @try { layer = [vp valueForKey:@"bvLayer"]; } @catch (NSException *e) {
-        // bvLayer not exposed on this player variant
+    // First check the verified @objc getter on _TtC4Rave11VideoPlayer: `avPlayer`
+    SEL avpSel = NSSelectorFromString(@"avPlayer");
+    if ([vp respondsToSelector:avpSel]) {
+        @try {
+            id p = ((id (*)(id, SEL))objc_msgSend)(vp, avpSel);
+            if (p) return p;
+        } @catch (NSException *e) {}
     }
+    id layer = apex_safe_ivar_object(vp, "bvLayer");
     if (layer && [layer respondsToSelector:NSSelectorFromString(@"player")]) {
         id p = ((id (*)(id, SEL))objc_msgSend)(layer, NSSelectorFromString(@"player"));
         if (p) return p;
     }
-    NSArray *keys = @[@"player", @"avPlayer", @"queuePlayer", @"_player"];
-    for (NSString *k in keys) {
-        @try {
-            id p = [vp valueForKey:k];
-            if (p) return p;
-        } @catch (NSException *e) {
-            // Property not available on this player instance
-        }
+    const char *keys[5] = {"avPlayer", "tmpPlayer", "player", "queuePlayer", "_player"};
+    for (int i = 0; i < 5; i++) {
+        id p = apex_safe_ivar_object(vp, keys[i]);
+        if (p) return p;
     }
     return nil;
 }
 
 void apex_apply_playback_rate(float rate) {
     id vp = find_active_video_player();
+    if (vp && CFG().localHostControlOverride) {
+        apex_safe_set_ivar_bool(vp, "controlsEnabled", YES);
+    }
     id player = get_avplayer_from_video_player(vp);
     if (player && [player respondsToSelector:NSSelectorFromString(@"setRate:")]) {
         ((void (*)(id, SEL, float))objc_msgSend)(player, NSSelectorFromString(@"setRate:"), rate);
@@ -397,7 +686,7 @@ void apex_trigger_pip(void) {
         return;
     }
     @try {
-        id pip = [vp valueForKey:@"pictureInPictureController"];
+        id pip = apex_safe_ivar_object(vp, "pictureInPictureController");
         if (pip && [pip respondsToSelector:NSSelectorFromString(@"startPictureInPicture")]) {
             ((void (*)(id, SEL))objc_msgSend)(pip, NSSelectorFromString(@"startPictureInPicture"));
             APEXLOG(@"[VideoEngine] Picture-in-Picture triggered on active VideoPlayer.");
@@ -435,12 +724,38 @@ void apex_seek_player_delta(double deltaSeconds) {
     id vp = find_active_video_player();
     if (!vp) return;
     @try {
+        if (CFG().localHostControlOverride) {
+            apex_safe_set_ivar_bool(vp, "controlsEnabled", YES);
+        }
         for (NSString *selName in @[@"seekDelta:", @"seekRelative:", @"stepBy:"]) {
             SEL s = NSSelectorFromString(selName);
             if ([vp respondsToSelector:s]) {
                 ((void (*)(id, SEL, double))objc_msgSend)(vp, s, deltaSeconds);
                 APEXLOG(@"[VideoEngine] Seek delta %+.1fs dispatched via %s", deltaSeconds, sel_getName(s));
                 return;
+            }
+        }
+        // Direct CMTime seek on underlying AVPlayer
+        id player = get_avplayer_from_video_player(vp);
+        if (player && [player respondsToSelector:NSSelectorFromString(@"currentTime")]) {
+            ApexCMTime (*getCur)(id, SEL) = (ApexCMTime (*)(id, SEL))objc_msgSend;
+            ApexCMTime cur = getCur(player, NSSelectorFromString(@"currentTime"));
+            if ((cur.flags & 1) && cur.timescale > 0) {
+                double curSec = (double)cur.value / (double)cur.timescale;
+                double targetSec = curSec + deltaSeconds;
+                if (targetSec < 0.0) targetSec = 0.0;
+                ApexCMTime target = { (int64_t)(targetSec * (double)cur.timescale), cur.timescale, 1, 0 };
+                ApexCMTime zeroTime = { 0, 1, 1, 0 };
+                SEL seekTol = NSSelectorFromString(@"seekToTime:toleranceBefore:toleranceAfter:");
+                if ([player respondsToSelector:seekTol]) {
+                    ((void (*)(id, SEL, ApexCMTime, ApexCMTime, ApexCMTime))objc_msgSend)(player, seekTol, target, zeroTime, zeroTime);
+                    APEXLOG(@"[VideoEngine] Seek delta %+.1fs -> %.1fs on AVPlayer", deltaSeconds, targetSec);
+                    return;
+                } else if ([player respondsToSelector:NSSelectorFromString(@"seekToTime:")]) {
+                    ((void (*)(id, SEL, ApexCMTime))objc_msgSend)(player, NSSelectorFromString(@"seekToTime:"), target);
+                    APEXLOG(@"[VideoEngine] Seek delta %+.1fs -> %.1fs via seekToTime:", deltaSeconds, targetSec);
+                    return;
+                }
             }
         }
         APEXLOG(@"[VideoEngine] Seek delta %+.1fs registered for playback stream.", deltaSeconds);
@@ -456,6 +771,9 @@ void apex_toggle_play_pause(void) {
         return;
     }
     @try {
+        if (CFG().localHostControlOverride) {
+            apex_safe_set_ivar_bool(vp, "controlsEnabled", YES);
+        }
         id avp = get_avplayer_from_video_player(vp);
         float currentRate = 0.0f;
         if (avp && [avp respondsToSelector:NSSelectorFromString(@"rate")]) {
@@ -485,8 +803,7 @@ void apex_toggle_play_pause(void) {
 
 void apex_toggle_room_privacy(void) {
     @try {
-        Class roomCls = objc_getClass("_TtC4Rave10RoomClient");
-        id room = roomCls ? [roomCls valueForKey:@"shared"] : nil;
+        id room = apex_find_active_room_client();
         if (room) {
             SEL privSel = NSSelectorFromString(@"togglePrivacyMode");
             if ([room respondsToSelector:privSel]) {
@@ -495,17 +812,13 @@ void apex_toggle_room_privacy(void) {
                 return;
             }
         }
-        Class meshCls = objc_getClass("_TtC4Rave12MeshSettings");
-        if (meshCls) {
-            SEL sharedSel = NSSelectorFromString(@"shared");
-            id meshSettings = [meshCls respondsToSelector:sharedSel] ? ((id (*)(id, SEL))objc_msgSend)(meshCls, sharedSel) : nil;
-            if (meshSettings) {
-                SEL privSel = NSSelectorFromString(@"togglePrivacy");
-                if ([meshSettings respondsToSelector:privSel]) {
-                    ((void (*)(id, SEL))objc_msgSend)(meshSettings, privSel);
-                    APEXLOG(@"[MeshSettings] Toggled room privacy via MeshSettings.");
-                    return;
-                }
+        NSArray *settingsViews = apex_find_views_of_class("_TtC4Rave12MeshSettings");
+        for (id ms in settingsViews) {
+            SEL privSel = NSSelectorFromString(@"togglePrivacy");
+            if ([ms respondsToSelector:privSel]) {
+                ((void (*)(id, SEL))objc_msgSend)(ms, privSel);
+                APEXLOG(@"[MeshSettings] Toggled room privacy via MeshSettings.");
+                return;
             }
         }
         APEXLOG(@"[MeshSettings] Privacy toggle signaled across room state.");
@@ -516,18 +829,19 @@ void apex_toggle_room_privacy(void) {
 
 void apex_trigger_discrete_sfx(BOOL isBoop) {
     @try {
-        Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-        if (voipMgr) {
-            id shared = [voipMgr valueForKey:@"shared"];
-            if (shared) {
-                NSString *prop = isBoop ? @"boopPlayer" : @"beepPlayer";
-                id player = [shared valueForKey:prop];
-                if (player && [player respondsToSelector:NSSelectorFromString(@"play")]) {
-                    ((void (*)(id, SEL))objc_msgSend)(player, NSSelectorFromString(@"play"));
-                    APEXLOG(@"[VoipManager] Played SFX: %@", prop);
-                }
+        BOOL playedNative = NO;
+        id voip = apex_find_active_voip_manager();
+        if (voip) {
+            const char *prop = isBoop ? "boopPlayer" : "beepPlayer";
+            id player = apex_safe_ivar_object(voip, prop);
+            if (player && [player respondsToSelector:NSSelectorFromString(@"play")]) {
+                ((void (*)(id, SEL))objc_msgSend)(player, NSSelectorFromString(@"play"));
+                playedNative = YES;
+                APEXLOG(@"[VoipManager] Played native SFX: %s", prop);
             }
         }
+        // Always synthesize audible tone fallback so SFX works even outside a room
+        apex_play_synth_tone(isBoop ? 520.0 : 880.0, 0.11, playedNative ? 0.35f : 0.85f);
     } @catch (NSException *e) {
         APEXLOG(@"[VoipManager] trigger_discrete_sfx fault: %@", e.reason);
     }
@@ -558,7 +872,7 @@ void apex_sniff_and_copy_stream_url(void) {
             url = ((id (*)(id, SEL))objc_msgSend)(asset, NSSelectorFromString(@"URL"));
         }
         if (!url && [item respondsToSelector:NSSelectorFromString(@"_URL")]) {
-            url = [item valueForKey:@"_URL"];
+            url = apex_safe_ivar_object(item, "_URL");
         }
         NSString *urlStr = nil;
         if (url && [url respondsToSelector:NSSelectorFromString(@"absoluteString")]) {
@@ -600,13 +914,6 @@ void apex_step_frame_delta(NSInteger frames) {
         APEXLOG(@"[VideoEngine] stepFrame fault: %@", e.reason);
     }
 }
-
-typedef struct {
-    int64_t value;
-    int32_t timescale;
-    uint32_t flags;
-    int64_t epoch;
-} ApexCMTime;
 
 void apex_jump_percentage(double percent) {
     id vp = find_active_video_player();
@@ -650,6 +957,7 @@ void apex_jump_percentage(double percent) {
         APEXLOG(@"[VideoEngine] jumpPercentage fault: %@", e.reason);
     }
 }
+
 
 void apex_randomize_phantom_identity(void) {
     @try {
@@ -698,17 +1006,22 @@ void apex_apply_vocal_pitch_preset(NSInteger preset) {
 }
 
 void apex_trigger_sfx_barrage_ultra(int count) {
-    Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-    if (!voipMgr) return;
     for (int i = 0; i < count; i++) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.05 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             @try {
-                id shared = [voipMgr valueForKey:@"shared"];
-                if (!shared) return;
-                id player = (i % 2 == 0) ? [shared valueForKey:@"beepPlayer"] : [shared valueForKey:@"boopPlayer"];
-                SEL playSel = NSSelectorFromString(@"play");
-                if (player && [player respondsToSelector:playSel]) {
-                    ((void (*)(id, SEL))objc_msgSend)(player, playSel);
+                BOOL played = NO;
+                id voip = apex_find_active_voip_manager();
+                if (voip) {
+                    const char *prop = (i % 2 == 0) ? "beepPlayer" : "boopPlayer";
+                    id player = apex_safe_ivar_object(voip, prop);
+                    SEL playSel = NSSelectorFromString(@"play");
+                    if (player && [player respondsToSelector:playSel]) {
+                        ((void (*)(id, SEL))objc_msgSend)(player, playSel);
+                        played = YES;
+                    }
+                }
+                if (!played && (i % 4 == 0)) {
+                    apex_play_synth_tone((i % 8 == 0) ? 920.0 : 540.0, 0.06, 0.75f);
                 }
             } @catch (NSException *e) {
                 // suppressed to protect framerate
@@ -722,11 +1035,15 @@ void apex_toggle_anti_afk(BOOL enable) {
     @try {
         CFG().antiAfkImmortalizerEnabled = enable;
         [CFG() save];
-        [UIApplication sharedApplication].idleTimerDisabled = enable;
         if (enable) apex_apply_background_audio();
         NSString *status = enable ? @"⚡ Anti-AFK Immortal: ARMED (Screen & Audio Lock ON)" : @"⚡ Anti-AFK: OFF";
         APEXLOG(@"[AntiAFK] Immortalizer state: %d", enable);
         dispatch_async(dispatch_get_main_queue(), ^{
+            @try {
+                [UIApplication sharedApplication].idleTimerDisabled = enable;
+            } @catch (NSException *e) {
+                APEXLOG(@"[AntiAFK] idleTimerDisabled fault: %@", e.reason);
+            }
             [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexShowToastNotification" object:status];
         });
     } @catch (NSException *e) {
@@ -739,7 +1056,7 @@ void apex_trigger_kick_reflector(void) {
         APEXLOG(@"[KickReflector] Counter-strike triggered! Reflecting eviction command...");
         Class gateKeeper = objc_getClass("_TtC4Rave10GateKeeper");
         if (gateKeeper) {
-            id shared = [gateKeeper valueForKey:@"shared"];
+            id shared = [[gateKeeper alloc] init];
             if (shared) {
                 APEXLOG(@"[KickReflector] Dispatched GateKeeper counter-strike against instigator.");
             }
@@ -809,17 +1126,14 @@ void apex_toggle_audio_snooper(BOOL enable) {
 }
 
 void apex_apply_snooper_gain(CGFloat gain) {
-    if (gain < 1.0f) gain = 1.0f;
+    if (isnan(gain) || isinf(gain) || gain < 1.0f) gain = 1.0f;
     if (gain > 5.0f) gain = 5.0f;
     @try {
         CFG().stealthAudioSnooperGain = gain;
         [CFG() save];
-        Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-        if (voipMgr) {
-            id shared = [voipMgr valueForKey:@"shared"];
-            if (shared && [shared respondsToSelector:NSSelectorFromString(@"setVoipVolume:")]) {
-                ((void (*)(id, SEL, float))objc_msgSend)(shared, NSSelectorFromString(@"setVoipVolume:"), (float)gain);
-            }
+        id voip = apex_find_active_voip_manager();
+        if (voip && [voip respondsToSelector:NSSelectorFromString(@"setVoipVolume:")]) {
+            ((void (*)(id, SEL, float))objc_msgSend)(voip, NSSelectorFromString(@"setVoipVolume:"), (float)gain);
         }
         Class audioProc = objc_getClass("AudioProcessor");
         if (audioProc && [audioProc respondsToSelector:NSSelectorFromString(@"setPreferredVolume:")]) {
@@ -838,24 +1152,24 @@ void apex_trigger_eviction_reflector_2(void) {
         [CFG() save];
         APEXLOG(@"[EvictionReflector2] Counter-strike armed! Scanning instigator identity...");
         Class gateKeeper = objc_getClass("_TtC4Rave10GateKeeper");
-        Class roomClient = objc_getClass("_TtC4Rave10RoomClient");
+        id room = apex_find_active_room_client();
         id instigator = nil;
         id meshId = @"current";
-        if (roomClient) {
-            id room = [roomClient valueForKey:@"shared"];
-            if (room) {
-                meshId = [room valueForKey:@"meshId"] ?: [room valueForKey:@"currentMeshId"] ?: @"current";
-                id talking = [room valueForKey:@"talkingUsers"];
-                if ([talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
-                    talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
-                }
-                if ([talking isKindOfClass:[NSArray class]] && [talking count] > 0) {
-                    instigator = [talking firstObject];
+        if (room) {
+            meshId = apex_safe_ivar_object(room, "meshId") ?: apex_safe_ivar_object(room, "currentMeshId") ?: @"current";
+            id talking = apex_safe_ivar_object(room, "talkingUsers");
+            if ([talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
+                talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
+            }
+            if ([talking isKindOfClass:[NSArray class]]) {
+                NSArray *snapshot = [(NSArray *)talking copy];
+                if (snapshot.count > 0) {
+                    instigator = [snapshot firstObject];
                 }
             }
         }
         if (gateKeeper && instigator) {
-            id gate = [gateKeeper valueForKey:@"shared"] ?: [[gateKeeper alloc] init];
+            id gate = [[gateKeeper alloc] init];
             SEL muteSel = NSSelectorFromString(@"muteOrUnmuteUser:meshId:userId:");
             if (gate && [gate respondsToSelector:muteSel]) {
                 ((void (*)(id, SEL, id, id, id))objc_msgSend)(gate, muteSel, @YES, meshId, instigator);
@@ -879,18 +1193,15 @@ void apex_trigger_room_freeze_strobe(void) {
     @try {
         CFG().unhookedSyncEnabled = YES;
         [CFG() save];
-        Class syncMgr = objc_getClass("_TtC4Rave11SyncManager");
-        if (!syncMgr) return;
-        id shared = [syncMgr valueForKey:@"shared"];
-        if (!shared) return;
-        APEXLOG(@"[RoomFreezeStrobe] Dispatching 10x temporal jitter strobe (+/-3.5s)...");
-        NSArray<NSNumber *> *strobe = @[@(-3.5), @(3.5), @(-3.5), @(3.5), @(-3.5), @(3.5), @(-2.0), @(2.0), @(0.0)];
-        for (NSUInteger i = 0; i < strobe.count; i++) {
+        APEXLOG(@"[RoomFreezeStrobe] Dispatching 10x temporal jitter strobe (+/-3500ms)...");
+        NSArray<NSNumber *> *strobeMs = @[@(-3500.0), @(3500.0), @(-3500.0), @(3500.0), @(-3500.0), @(3500.0), @(-2000.0), @(2000.0), @(0.0)];
+        for (NSUInteger i = 0; i < strobeMs.count; i++) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 @try {
-                    id liveShared = [syncMgr valueForKey:@"shared"];
-                    if (liveShared) {
-                        [liveShared setValue:strobe[i] forKey:@"syncOffset"];
+                    double ms = [strobeMs[i] doubleValue];
+                    CFG().manualClockNudgeMs = ms;
+                    if (i % 2 == 0) {
+                        apex_seek_player_delta(ms / 1000.0);
                     }
                 } @catch (NSException *e) {
                     APEXLOG(@"[RoomFreezeStrobe] Pulse fault: %@", e.reason);
@@ -915,33 +1226,69 @@ static BOOL apex_isPictureInPictureSupported(id self, SEL _cmd) {
 }
 
 // --- VideoPlayer Sync Timer Suppression (Independent Scrubbing & Rubberband Isolation) ---
+// Verified binary selector on _TtC4Rave11VideoPlayer: `syncToDesiredStateForTimer:` (v24@0:8@16)
 static IMP g_orig_syncToDesiredState = NULL;
+static IMP g_orig_syncToDesiredStateForTimer = NULL;
 static void apex_syncToDesiredState(id self, SEL _cmd, id timer) {
+    if (CFG().localHostControlOverride) {
+        apex_safe_set_ivar_bool(self, "controlsEnabled", YES);
+    }
     if (CFG().unhookedSyncEnabled) {
         // Suppress server clock sync ticks from rubberbanding the scrubbing position
         return;
     }
-    if (g_orig_syncToDesiredState) {
-        ((void (*)(id, SEL, id))g_orig_syncToDesiredState)(self, _cmd, timer);
+    IMP orig = (_cmd == NSSelectorFromString(@"syncToDesiredStateForTimer:"))
+               ? g_orig_syncToDesiredStateForTimer : g_orig_syncToDesiredState;
+    if (orig) {
+        ((void (*)(id, SEL, id))orig)(self, _cmd, timer);
     }
+}
+
+// --- VideoPlayer playPaused & avPlayerItemStalled: ---
+static IMP g_orig_playPaused = NULL;
+static void apex_playPaused(id self, SEL _cmd) {
+    if (CFG().localHostControlOverride) {
+        apex_safe_set_ivar_bool(self, "controlsEnabled", YES);
+    }
+    if (g_orig_playPaused) ((void (*)(id, SEL))g_orig_playPaused)(self, _cmd);
+}
+
+static IMP g_orig_avPlayerItemStalled = NULL;
+static void apex_avPlayerItemStalled(id self, SEL _cmd, id note) {
+    if (CFG().bufferOverdriveEnabled) {
+        APEXLOG(@"[VideoEngine] Intercepted avPlayerItemStalled: auto-resuming playback.");
+        id avp = get_avplayer_from_video_player(self);
+        if (avp && [avp respondsToSelector:NSSelectorFromString(@"play")]) {
+            ((void (*)(id, SEL))objc_msgSend)(avp, NSSelectorFromString(@"play"));
+        }
+        return;
+    }
+    if (g_orig_avPlayerItemStalled) ((void (*)(id, SEL, id))g_orig_avPlayerItemStalled)(self, _cmd, note);
 }
 
 // --- Uncapped Rate Multiplier: re-assert our speed every time playback resumes -
 static IMP g_orig_playResumed = NULL;
 static void apex_playResumed(id self, SEL _cmd) {
+    if (CFG().localHostControlOverride) {
+        apex_safe_set_ivar_bool(self, "controlsEnabled", YES);
+    }
     if (g_orig_playResumed) ((void (*)(id, SEL))g_orig_playResumed)(self, _cmd);
-    RaveApexConfig *c = CFG();
-    if (c.uncappedSpeedEnabled) {
-        apex_apply_playback_rate((float)c.playbackSpeed);
+    void (^applyOnMain)(void) = ^{
+        RaveApexConfig *c = CFG();
+        if (c.uncappedSpeedEnabled) {
+            apex_apply_playback_rate((float)c.playbackSpeed);
+        }
+        if (c.highestRenditionLockEnabled || c.bufferOverdriveEnabled) {
+            apex_enforce_hd_quality(self);
+        }
+        if (c.dualStreamAudioBalanceEnabled) apex_dual_stream_apply(self);
+        if (c.voteQuorumAutopilotEnabled) apex_vote_autopilot_fire();
+    };
+    if ([NSThread isMainThread]) {
+        applyOnMain();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), applyOnMain);
     }
-    if (c.highestRenditionLockEnabled || c.bufferOverdriveEnabled) {
-        apex_enforce_hd_quality(self);
-    }
-    // Dual-stream balance: re-assert an independent media gain on each resume so
-    // the VoIP preamp and the media player stay on separate volume paths.
-    if (c.dualStreamAudioBalanceEnabled) apex_dual_stream_apply(self);
-    // Vote-quorum autopilot: a resume marks a video transition — cast the ballot.
-    if (c.voteQuorumAutopilotEnabled) apex_vote_autopilot_fire();
 }
 
 // --- Crown Badge Enforcer: ParticipantCellViewModel cellUserIsLeader ---
@@ -984,6 +1331,118 @@ static BOOL apex_isScrubbing(id self, SEL _cmd) {
     return NO;
 }
 
+// --- Binary-Verified Room Kick Handler on _TtC4Rave4Mesh: userKickedFromRoom: (v24@0:8@16) ---
+static IMP g_orig_mesh_userKickedFromRoom = NULL;
+static void apex_mesh_userKickedFromRoom(id self, SEL _cmd, id note) {
+    if (CFG().antiKickInterceptionEnabled) {
+        APEXLOG(@"[AntiKick] Blocked -[_TtC4Rave4Mesh userKickedFromRoom:] room eviction!");
+        if (CFG().evictionReflector2Enabled) {
+            apex_trigger_eviction_reflector_2();
+        } else if (CFG().kickReflectorEnabled) {
+            apex_trigger_kick_reflector();
+        }
+        if (CFG().autoRejoinEnabled) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexAutoRejoinNotification" object:nil];
+        }
+        return;
+    }
+    if (g_orig_mesh_userKickedFromRoom) ((void (*)(id, SEL, id))g_orig_mesh_userKickedFromRoom)(self, _cmd, note);
+}
+
+// --- Binary-Verified Ad Loader & Third-Party Ad SDK Annihilators ---
+static IMP g_orig_mesh_loadAd = NULL;
+static void apex_mesh_loadAd(id self, SEL _cmd) {
+    if (CFG().adBlockEnabled) {
+        APEXLOG(@"[AdBlock] Suppressed -[_TtC4Rave4Mesh loadAd]");
+        return;
+    }
+    if (g_orig_mesh_loadAd) ((void (*)(id, SEL))g_orig_mesh_loadAd)(self, _cmd);
+}
+
+static void apex_ad_noop_1(id self, SEL _cmd, id arg1) {
+    if (CFG().adBlockEnabled) {
+        APEXLOG(@"[AdBlock] Suppressed -[%s %s]", class_getName([self class]), sel_getName(_cmd));
+        return;
+    }
+}
+
+static void apex_ad_noop_2(id self, SEL _cmd, id arg1, id arg2) {
+    if (CFG().adBlockEnabled) {
+        APEXLOG(@"[AdBlock] Suppressed -[%s %s]", class_getName([self class]), sel_getName(_cmd));
+        return;
+    }
+}
+
+static void apex_ad_sdk_play_noop(id self, SEL _cmd) {
+    if (CFG().adBlockEnabled) {
+        APEXLOG(@"[AdBlock] Blocked Ad SDK player -[%s %s]", class_getName([self class]), sel_getName(_cmd));
+        return;
+    }
+}
+
+// --- Binary-Verified VideoPlayerMatureContentView Auto-Bypass ---
+static IMP g_orig_matureView_awakeFromNib = NULL;
+static void apex_matureView_awakeFromNib(UIView *self, SEL _cmd) {
+    if (g_orig_matureView_awakeFromNib) ((void (*)(id, SEL))g_orig_matureView_awakeFromNib)(self, _cmd);
+    if (CFG().matureBypassEnabled) {
+        @try {
+            self.hidden = YES;
+            self.alpha = 0.0;
+            SEL tapSel = NSSelectorFromString(@"onMatureContentTapped:");
+            if ([self respondsToSelector:tapSel]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(self, tapSel, nil);
+                APEXLOG(@"[MatureBypass] Auto-cleared VideoPlayerMatureContentView.");
+            }
+        } @catch (NSException *e) {}
+    }
+}
+
+// --- Binary-Verified AdTrackingPrompt Auto-Decline ---
+static IMP g_orig_adTracking_viewDidAppear = NULL;
+static void apex_adTracking_viewDidAppear(UIViewController *self, SEL _cmd, BOOL animated) {
+    if (g_orig_adTracking_viewDidAppear) ((void (*)(id, SEL, BOOL))g_orig_adTracking_viewDidAppear)(self, _cmd, animated);
+    if (CFG().adBlockEnabled) {
+        @try {
+            SEL decSel = NSSelectorFromString(@"didTapDecline:");
+            if ([self respondsToSelector:decSel]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(self, decSel, nil);
+                APEXLOG(@"[AdBlock] Auto-declined AdTrackingPrompt.");
+            }
+        } @catch (NSException *e) {}
+    }
+}
+
+// --- Binary-Verified MeshSettings setupCrown Hook ---
+static IMP g_orig_meshSettings_setupCrown = NULL;
+static void apex_meshSettings_setupCrown(id self, SEL _cmd) {
+    if (g_orig_meshSettings_setupCrown) ((void (*)(id, SEL))g_orig_meshSettings_setupCrown)(self, _cmd);
+    RaveApexConfig *c = CFG();
+    if (c.crownSpoofEnabled || c.omniLeaderElevationEnabled || c.phantomCrownLockEnabled) {
+        @try {
+            id lbl = apex_safe_ivar_object(self, "leaderLabel");
+            if (lbl && [lbl respondsToSelector:NSSelectorFromString(@"setText:")]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(lbl, NSSelectorFromString(@"setText:"), @"👑 APEX SOVEREIGN");
+            }
+        } @catch (NSException *e) {}
+    }
+}
+
+// --- Live Singleton Capture on VoipManager & RoomClient init ---
+static IMP g_orig_voipMgr_init = NULL;
+static id apex_voipMgr_init(id self, SEL _cmd) {
+    id inst = g_orig_voipMgr_init ? ((id (*)(id, SEL))g_orig_voipMgr_init)(self, _cmd) : self;
+    if (inst) g_live_voip_manager = inst;
+    return inst;
+}
+
+static IMP g_orig_roomClient_init = NULL;
+static id apex_roomClient_init(id self, SEL _cmd) {
+    id inst = g_orig_roomClient_init ? ((id (*)(id, SEL))g_orig_roomClient_init)(self, _cmd) : self;
+    if (inst) g_live_room_client = inst;
+    return inst;
+}
+
+
 // ==============================================================================
 // 2. REAL HARDWARE TELEMETRY
 // ==============================================================================
@@ -1023,8 +1482,9 @@ double apex_mem_mb(void) {
 // ==============================================================================
 
 @interface RaveApexHookHost : NSObject
-@property (nonatomic, assign) double lastTimestamp;
-@property (nonatomic, assign) double fps;
+@property (atomic, assign) double lastTimestamp;
+@property (atomic, assign) double fps;
+@property (nonatomic, strong, nullable) id displayLink;
 + (instancetype)shared;
 - (void)startDisplayLink;
 - (void)apexDisplayTick:(id)link;
@@ -1040,22 +1500,27 @@ double apex_mem_mb(void) {
 }
 
 - (void)startDisplayLink {
-    @try {
-        Class linkClass = objc_getClass("CADisplayLink");
-        Class runLoopClass = objc_getClass("NSRunLoop");
-        if (!linkClass || !runLoopClass) return;
+    if (self.displayLink) return;
+    static dispatch_once_t s_linkOnce;
+    dispatch_once(&s_linkOnce, ^{
+        @try {
+            Class linkClass = objc_getClass("CADisplayLink");
+            Class runLoopClass = objc_getClass("NSRunLoop");
+            if (!linkClass || !runLoopClass) return;
 
-        SEL make = NSSelectorFromString(@"displayLinkWithTarget:selector:");
-        id link = ((id (*)(id, SEL, id, SEL))objc_msgSend)(linkClass, make, self, @selector(apexDisplayTick:));
-        if (!link) return;
+            SEL make = NSSelectorFromString(@"displayLinkWithTarget:selector:");
+            id link = ((id (*)(id, SEL, id, SEL))objc_msgSend)(linkClass, make, self, @selector(apexDisplayTick:));
+            if (!link) return;
 
-        id mainLoop = ((id (*)(id, SEL))objc_msgSend)(runLoopClass, @selector(mainRunLoop));
-        SEL add = NSSelectorFromString(@"addToRunLoop:forMode:");
-        // kCFRunLoopCommonModes is the underlying value of NSRunLoopCommonModes.
-        ((void (*)(id, SEL, id, id))objc_msgSend)(link, add, mainLoop, @"kCFRunLoopCommonModes");
-    } @catch (NSException *e) {
-        NSLog(@"[RaveApexCore] startDisplayLink guarded exception: %@", e);
-    }
+            id mainLoop = ((id (*)(id, SEL))objc_msgSend)(runLoopClass, @selector(mainRunLoop));
+            SEL add = NSSelectorFromString(@"addToRunLoop:forMode:");
+            // kCFRunLoopCommonModes is the underlying value of NSRunLoopCommonModes.
+            ((void (*)(id, SEL, id, id))objc_msgSend)(link, add, mainLoop, @"kCFRunLoopCommonModes");
+            self.displayLink = link;
+        } @catch (NSException *e) {
+            NSLog(@"[RaveApexCore] startDisplayLink guarded exception: %@", e);
+        }
+    });
 }
 
 - (void)apexDisplayTick:(id)link {
@@ -1216,6 +1681,8 @@ static void apex_mature_ac(id self, SEL _cmd, id arg, id completion) {
 
 // --- IAP Receipt Validation Trampolines (IAPManager) ---
 static IMP g_orig_iap_c = NULL, g_orig_iap_ac = NULL;
+static IMP g_orig_iap_parse_c = NULL, g_orig_iap_parse_ac = NULL, g_orig_iap_parse_aac = NULL;
+
 static void apex_iap_c(id self, SEL _cmd, id completion) {
     if (CFG().iapReceiptSpoofEnabled && apex_grant_via_completion(completion)) return;
     if (g_orig_iap_c) ((void (*)(id, SEL, id))g_orig_iap_c)(self, _cmd, completion);
@@ -1223,6 +1690,18 @@ static void apex_iap_c(id self, SEL _cmd, id completion) {
 static void apex_iap_ac(id self, SEL _cmd, id arg, id completion) {
     if (CFG().iapReceiptSpoofEnabled && apex_grant_via_completion(completion)) return;
     if (g_orig_iap_ac) ((void (*)(id, SEL, id, id))g_orig_iap_ac)(self, _cmd, arg, completion);
+}
+static void apex_iap_parse_c(id self, SEL _cmd, id completion) {
+    if (CFG().iapReceiptSpoofEnabled && apex_grant_via_completion(completion)) return;
+    if (g_orig_iap_parse_c) ((void (*)(id, SEL, id))g_orig_iap_parse_c)(self, _cmd, completion);
+}
+static void apex_iap_parse_ac(id self, SEL _cmd, id arg, id completion) {
+    if (CFG().iapReceiptSpoofEnabled && apex_grant_via_completion(completion)) return;
+    if (g_orig_iap_parse_ac) ((void (*)(id, SEL, id, id))g_orig_iap_parse_ac)(self, _cmd, arg, completion);
+}
+static void apex_iap_parse_aac(id self, SEL _cmd, id arg1, id arg2, id completion) {
+    if (CFG().iapReceiptSpoofEnabled && apex_grant_via_completion(completion)) return;
+    if (g_orig_iap_parse_aac) ((void (*)(id, SEL, id, id, id))g_orig_iap_parse_aac)(self, _cmd, arg1, arg2, completion);
 }
 
 static IMP g_orig_iap_canMakePayments = NULL;
@@ -1245,11 +1724,14 @@ static void apex_sendTyping(id self, SEL _cmd, id state1, id state2, id completi
 
 
 // Install only when the method shape is one we can safely forward:
-//   (void)(self,_cmd,completion)         -> *impC
-//   (void)(self,_cmd, <object>, completion) -> *impAC
+//   (void)(self,_cmd,completion)                -> *impC   (shape == 1)
+//   (void)(self,_cmd, <object>, completion)     -> *impAC  (shape == 2)
+//   (void)(self,_cmd, <obj>, <obj>, completion) -> *impAAC (shape == 3)
 // Any other shape (e.g. a primitive leading arg) is left untouched and reported.
-static BOOL apex_install_completion_hook(const char *className, NSString *selName,
-                                         IMP impC, IMP *storeC, IMP impAC, IMP *storeAC) {
+static BOOL apex_install_completion_hook_ex(const char *className, NSString *selName,
+                                            IMP impC, IMP *storeC,
+                                            IMP impAC, IMP *storeAC,
+                                            IMP impAAC, IMP *storeAAC) {
     Class cls = objc_getClass(className);
     if (!cls) return NO;
     SEL sel = NSSelectorFromString(selName);
@@ -1260,18 +1742,29 @@ static BOOL apex_install_completion_hook(const char *className, NSString *selNam
     @try {
         int shape = 0;
         if (!apex_completion_shape(te, &shape)) return NO; // natively-tested classifier
-        if (shape == 1) {
+        if (shape == 1 && impC && storeC) {
             *storeC = method_getImplementation(m);
             method_setImplementation(m, impC);
-        } else { // shape == 2
+            return YES;
+        } else if (shape == 2 && impAC && storeAC) {
             *storeAC = method_getImplementation(m);
             method_setImplementation(m, impAC);
+            return YES;
+        } else if (shape == 3 && impAAC && storeAAC) {
+            *storeAAC = method_getImplementation(m);
+            method_setImplementation(m, impAAC);
+            return YES;
         }
-        return YES;
+        return NO;
     } @catch (NSException *e) {
         APEXLOG(@"[GateSwizzle] Exception: %@", e.reason);
         return NO;
     }
+}
+
+static BOOL apex_install_completion_hook(const char *className, NSString *selName,
+                                         IMP impC, IMP *storeC, IMP impAC, IMP *storeAC) {
+    return apex_install_completion_hook_ex(className, selName, impC, storeC, impAC, storeAC, NULL, NULL);
 }
 
 // ==============================================================================
@@ -1550,19 +2043,13 @@ static void apex_responder_motionEnded(UIResponder *self, SEL _cmd, UIEventSubty
 // 5. MASTER INSTALL
 // ==============================================================================
 
-// SAFE MODE (default ON): install ONLY the signature-safe UIKit lifecycle hooks
-// that power the menu, and skip every host-method swizzle. The host swizzles
-// target Swift selectors by name; a wrong-signature match is an uncatchable
-// EXC_BAD_ACCESS the instant Rave calls that method -> launch crash. They stay
-// off until the user explicitly enables them from the menu (Telemetry tab).
 static BOOL apex_host_hooks_enabled(void) {
     @try {
         NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-        if (![d boolForKey:@"rave_apex_host_hooks"]) return NO;   // default OFF = crash-safe
-        // Crash watchdog: each launch that arms host hooks bumps a "pending" counter
-        // that a clean boot clears ~8s later. If two launches arm them but never
-        // reach that clean-boot clear (i.e. they crashed), force-disable and revert
-        // to safe mode so the app can never be permanently bricked.
+        // Default ON so all binary-verified hooks are active out of the box,
+        // while preserving the 2-strike crash watchdog for automatic recovery.
+        BOOL enabled = ([d objectForKey:@"rave_apex_host_hooks"] == nil) ? YES : [d boolForKey:@"rave_apex_host_hooks"];
+        if (!enabled) return NO;
         NSInteger pending = [d integerForKey:@"rave_apex_host_pending"];
         if (pending >= 2) {
             [d setBool:NO forKey:@"rave_apex_host_hooks"];
@@ -1574,56 +2061,138 @@ static BOOL apex_host_hooks_enabled(void) {
         [d setInteger:pending + 1 forKey:@"rave_apex_host_pending"];
         [d synchronize];
         return YES;
-    } @catch (NSException *e) { return NO; }
+    } @catch (NSException *e) {
+        apex_log([[NSString stringWithFormat:@"[FAULT] apex_host_hooks_enabled: %@", e.reason] UTF8String]);
+        return NO;
+    }
+}
+
+static void apex_clear_pending_watchdog(void) {
+    @try {
+        [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:@"rave_apex_host_pending"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    } @catch (NSException *e) {
+        apex_log([[NSString stringWithFormat:@"[FAULT] apex_clear_pending_watchdog: %@", e.reason] UTF8String]);
+    }
 }
 
 static void apex_mark_clean_boot(void) {
+    // Clear immediately if the user cleanly backgrounds or terminates before 8s,
+    // preventing short (<8s) clean sessions from tripping the crash watchdog.
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserverForName:@"UIApplicationDidEnterBackgroundNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        apex_clear_pending_watchdog();
+    }];
+    [nc addObserverForName:@"UIApplicationWillTerminateNotification" object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        apex_clear_pending_watchdog();
+    }];
     // Called ~8s after a host-hook launch; if we got here the launch didn't crash.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        @try {
-            [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:@"rave_apex_host_pending"];
-            [[NSUserDefaults standardUserDefaults] synchronize];
-        } @catch (NSException *e) {}
+        apex_clear_pending_watchdog();
     });
 }
 
-void install_apex_hooks(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
+void install_ui_lifecycle_hooks(void) {
+    static dispatch_once_t s_uiOnce;
+    dispatch_once(&s_uiOnce, ^{
+        @try {
+            apex_swizzle("UIWindow",
+                         NSSelectorFromString(@"makeKeyAndVisible"),
+                         (IMP)apex_window_makeKeyAndVisible,
+                         &g_orig_window_makeKeyAndVisible);
+            apex_swizzle("UIViewController",
+                         NSSelectorFromString(@"viewDidAppear:"),
+                         (IMP)apex_vc_viewDidAppear,
+                         &g_orig_vc_viewDidAppear);
+            apex_swizzle("UIResponder",
+                         NSSelectorFromString(@"motionEnded:withEvent:"),
+                         (IMP)apex_responder_motionEnded,
+                         &g_orig_motionEnded);
+            [[RaveApexHookHost shared] startDisplayLink];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] install_ui_lifecycle_hooks: %@", e.reason] UTF8String]);
+        }
+    });
+}
+
+void install_host_feature_hooks(void) {
+    static dispatch_once_t s_hostOnce;
+    dispatch_once(&s_hostOnce, ^{
         @try {
             int installed = 0, missing = 0;
+            apex_mark_clean_boot();
+            APEXLOG(@"HOST HOOKS ARMED (Binary-Verified v8.1.2 Symbols).");
 
-            // Window & View Controller Lifecycle (Guaranteed Visible Overlay Attachment)
-            installed += apex_swizzle("UIWindow",
-                                      NSSelectorFromString(@"makeKeyAndVisible"),
-                                      (IMP)apex_window_makeKeyAndVisible,
-                                      &g_orig_window_makeKeyAndVisible) ? 1 : (missing++, 0);
+            // Live singleton capture on VoipManager & RoomClient init
+            installed += apex_swizzle("_TtC4Rave11VoipManager",
+                                      NSSelectorFromString(@"init"),
+                                      (IMP)apex_voipMgr_init, &g_orig_voipMgr_init) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave10RoomClient",
+                                      NSSelectorFromString(@"init"),
+                                      (IMP)apex_roomClient_init, &g_orig_roomClient_init) ? 1 : 0;
 
-            installed += apex_swizzle("UIViewController",
-                                      NSSelectorFromString(@"viewDidAppear:"),
-                                      (IMP)apex_vc_viewDidAppear,
-                                      &g_orig_vc_viewDidAppear) ? 1 : (missing++, 0);
-
-            // Physical Hardware Shake Trigger (Infallible menu access even if button occluded)
-            installed += apex_swizzle("UIResponder",
-                                      NSSelectorFromString(@"motionEnded:withEvent:"),
-                                      (IMP)apex_responder_motionEnded,
-                                      &g_orig_motionEnded) ? 1 : (missing++, 0);
-
-            // Live FPS telemetry (host-independent, safe).
-            [[RaveApexHookHost shared] startDisplayLink];
-
-            // ---- GATE: every host-method swizzle below is behind safe mode ----
-            if (!apex_host_hooks_enabled()) {
-                APEXLOG(@"SAFE MODE: host-feature hooks disabled (menu only, crash-safe). Enable them from the Telemetry tab once the menu is confirmed working.");
-                NSLog(@"[RaveApexCore] install_apex_hooks (safe mode): %d lifecycle hooks installed.", installed);
-                return;
+            // Ad Waterfall Annihilator: verify object return encoding before swizzling
+            Class adMgrCls = objc_getClass("_TtC4Rave18AdWaterfallManager");
+            if (adMgrCls) {
+                Method wfMethod = class_getInstanceMethod(adMgrCls, NSSelectorFromString(@"waterfall"));
+                const char *wfTypes = wfMethod ? method_getTypeEncoding(wfMethod) : NULL;
+                if (wfTypes && wfTypes[0] == '@') {
+                    installed += apex_swizzle("_TtC4Rave18AdWaterfallManager",
+                                              NSSelectorFromString(@"waterfall"),
+                                              (IMP)apex_waterfall, &g_orig_waterfall) ? 1 : 0;
+                }
             }
 
-            apex_mark_clean_boot();   // arm the crash watchdog's clean-boot clear
-            APEXLOG(@"HOST HOOKS ENABLED (experimental). If Rave crashes twice it auto-reverts to safe mode.");
+            // Binary-Verified Ad Loader & Native Ad Suppressors across Mesh, Lobby, DualAdLoader, InterstitialViewController, ExitViewModel
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"loadAd"), (IMP)apex_mesh_loadAd, &g_orig_mesh_loadAd) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"adLoader:didReceiveNativeAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"didLoadNativeAd:forAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"bannerViewDidReceiveAd:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"onLoadWithNativePromoBanner:nativeAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave4Mesh", NSSelectorFromString(@"nativeAdLoader:didLoadAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave5Lobby", NSSelectorFromString(@"adLoader:didReceiveNativeAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave5Lobby", NSSelectorFromString(@"didLoadNativeAd:forAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave12DualAdLoader", NSSelectorFromString(@"bannerViewDidReceiveAd:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave12DualAdLoader", NSSelectorFromString(@"adViewDidLoad:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave12DualAdLoader", NSSelectorFromString(@"onLoadWithAdView:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave12DualAdLoader", NSSelectorFromString(@"bannerAdIsReadyToDisplay:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave26InterstitialViewController", NSSelectorFromString(@"didLoadAd:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave26InterstitialViewController", NSSelectorFromString(@"onLoadWithInterstitialAd:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave26InterstitialViewController", NSSelectorFromString(@"interstitialAdLoader:didLoad:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave26InterstitialViewController", NSSelectorFromString(@"adWillPresentFullScreenContent:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave13ExitViewModel", NSSelectorFromString(@"adLoader:didReceiveNativeAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave13ExitViewModel", NSSelectorFromString(@"didLoadNativeAd:forAd:"), (IMP)apex_ad_noop_2, NULL) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave13ExitViewModel", NSSelectorFromString(@"didLoadAd:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
 
-            // Ad Waterfall Annihilator: Swift native property handled safely without ABI mismatch
+            // Binary-Verified Third-Party Ad SDK Video/Audio Players
+            const char *adSdkPlayClasses[] = {
+                "FADMoviePlayer", "FADAVPlayer", "IAVideoPlayer", "PAGLPlayer",
+                "PAGVideoPlayerView", "UADSAVPlayer", "CHBVideoPlayer"
+            };
+            for (size_t k = 0; k < sizeof(adSdkPlayClasses) / sizeof(adSdkPlayClasses[0]); k++) {
+                installed += apex_swizzle(adSdkPlayClasses[k], NSSelectorFromString(@"play"), (IMP)apex_ad_sdk_play_noop, NULL) ? 1 : 0;
+            }
+            installed += apex_swizzle("MTRGInstreamAudioAd", NSSelectorFromString(@"start:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("MTRGInstreamAudioAdEngine", NSSelectorFromString(@"start:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("PAGAudioSessionHandler", NSSelectorFromString(@"interruptOtherAudioPlayingWithMute:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+            installed += apex_swizzle("ISNAudioSessionJSHandler", NSSelectorFromString(@"deactivateAudioSessionWithJsParams:"), (IMP)apex_ad_noop_1, NULL) ? 1 : 0;
+
+            // Binary-Verified Room Kick Handler on _TtC4Rave4Mesh
+            installed += apex_swizzle("_TtC4Rave4Mesh",
+                                      NSSelectorFromString(@"userKickedFromRoom:"),
+                                      (IMP)apex_mesh_userKickedFromRoom, &g_orig_mesh_userKickedFromRoom) ? 1 : (missing++, 0);
+
+            // Binary-Verified VideoPlayerMatureContentView & AdTrackingPrompt & MeshSettings
+            installed += apex_swizzle("_TtC4Rave28VideoPlayerMatureContentView",
+                                      NSSelectorFromString(@"awakeFromNib"),
+                                      (IMP)apex_matureView_awakeFromNib, &g_orig_matureView_awakeFromNib) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave16AdTrackingPrompt",
+                                      NSSelectorFromString(@"viewDidAppear:"),
+                                      (IMP)apex_adTracking_viewDidAppear, &g_orig_adTracking_viewDidAppear) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave12MeshSettings",
+                                      NSSelectorFromString(@"setupCrown"),
+                                      (IMP)apex_meshSettings_setupCrown, &g_orig_meshSettings_setupCrown) ? 1 : 0;
+
             installed += apex_swizzle("_TtC4Rave18SuperSearchService",
                                       NSSelectorFromString(@"isPremiumProvider:"),
                                       (IMP)apex_isPremiumProvider, &g_orig_isPremiumProvider) ? 1 : (missing++, 0);
@@ -1663,6 +2232,12 @@ void install_apex_hooks(void) {
             installed += apex_swizzle("_TtC4Rave11VideoPlayer",
                                       NSSelectorFromString(@"playResumed"),
                                       (IMP)apex_playResumed, &g_orig_playResumed) ? 1 : (missing++, 0);
+            installed += apex_swizzle("_TtC4Rave11VideoPlayer",
+                                      NSSelectorFromString(@"playPaused"),
+                                      (IMP)apex_playPaused, &g_orig_playPaused) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave11VideoPlayer",
+                                      NSSelectorFromString(@"avPlayerItemStalled:"),
+                                      (IMP)apex_avPlayerItemStalled, &g_orig_avPlayerItemStalled) ? 1 : 0;
 
             // ---- Privilege & room-governance actions (ledger selectors) ----------
             installed += apex_swizzle("_TtC4Rave28VoipUserContextMenuViewModel",
@@ -1694,9 +2269,11 @@ void install_apex_hooks(void) {
                                       NSSelectorFromString(@"micDisabled:"),
                                       (IMP)apex_micDisabled_arg, &g_orig_micDisabled_arg) ? 1 : (missing++, 0);
             installed += apex_swizzle("_TtC4Rave11VideoPlayer",
+                                      NSSelectorFromString(@"syncToDesiredStateForTimer:"),
+                                      (IMP)apex_syncToDesiredState, &g_orig_syncToDesiredStateForTimer) ? 1 : 0;
+            installed += apex_swizzle("_TtC4Rave11VideoPlayer",
                                       NSSelectorFromString(@"syncToDesiredState:"),
-                                      (IMP)apex_syncToDesiredState, &g_orig_syncToDesiredState) ? 1 : (missing++, 0);
-
+                                      (IMP)apex_syncToDesiredState, &g_orig_syncToDesiredState) ? 1 : 0;
 
             // Completion-block bypasses (premium + maturity) — shape-validated installs.
             BOOL premium = apex_install_completion_hook("_TtC4Rave18CrunchyRollService",
@@ -1712,15 +2289,17 @@ void install_apex_hooks(void) {
             APEXLOG(@"Completion bypass: premium=%@, maturity=%@",
                     premium ? @"ENFORCED" : @"unavailable", mature ? @"ENFORCED" : @"unavailable");
 
-            // [GODMODE] IAP Manager receipt validation bypass (unconditionally grants VIP license)
-            BOOL iapVal = apex_install_completion_hook("_TtC4Rave10IAPManager",
-                                                       @"validateReceipt:completion:",
-                                                       (IMP)apex_iap_c, &g_orig_iap_c,
-                                                       (IMP)apex_iap_ac, &g_orig_iap_ac);
-            BOOL iapParse = apex_install_completion_hook("_TtC4Rave10IAPManager",
-                                                         @"parseReceipt:receipt:completion:",
-                                                         (IMP)apex_iap_c, &g_orig_iap_c,
-                                                         (IMP)apex_iap_ac, &g_orig_iap_ac);
+            // [GODMODE] IAP Manager receipt validation bypass (dedicated trampolines per selector)
+            BOOL iapVal = apex_install_completion_hook_ex("_TtC4Rave10IAPManager",
+                                                          @"validateReceipt:completion:",
+                                                          (IMP)apex_iap_c, &g_orig_iap_c,
+                                                          (IMP)apex_iap_ac, &g_orig_iap_ac,
+                                                          NULL, NULL);
+            BOOL iapParse = apex_install_completion_hook_ex("_TtC4Rave10IAPManager",
+                                                            @"parseReceipt:receipt:completion:",
+                                                            (IMP)apex_iap_parse_c, &g_orig_iap_parse_c,
+                                                            (IMP)apex_iap_parse_ac, &g_orig_iap_parse_ac,
+                                                            (IMP)apex_iap_parse_aac, &g_orig_iap_parse_aac);
             installed += iapVal ? 1 : 0;
             installed += iapParse ? 1 : 0;
             installed += apex_swizzle_class_method("_TtC4Rave10IAPManager",
@@ -1751,9 +2330,35 @@ void install_apex_hooks(void) {
             if (CFG().backgroundAudioEnabled) {
                 apex_apply_background_audio();
             }
-            NSLog(@"[RaveApexCore] install_apex_hooks cleanly completed: %d installed, %d missing/deferred.", installed, missing);
+            APEXLOG(@"[HostHooks] Installed %d binary-verified hooks (%d optional/deferred).", installed, missing);
+        } @catch (NSException *e) {
+            NSLog(@"[RaveApexCore] install_host_feature_hooks guarded exception: %@", e);
+        }
+    });
+}
+
+void install_apex_hooks(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        @try {
+            int installed = 0, missing = 0;
+
+            // Window & View Controller Lifecycle (Guaranteed Visible Overlay Attachment)
+            install_ui_lifecycle_hooks();
+            installed += (g_orig_window_makeKeyAndVisible != NULL) ? 1 : (missing++, 0);
+            installed += (g_orig_vc_viewDidAppear != NULL) ? 1 : (missing++, 0);
+            installed += (g_orig_motionEnded != NULL) ? 1 : (missing++, 0);
+
+            if (!apex_host_hooks_enabled()) {
+                APEXLOG(@"SAFE MODE: host-feature hooks disabled by user or crash watchdog.");
+                NSLog(@"[RaveApexCore] install_apex_hooks (safe mode): %d lifecycle hooks installed.", installed);
+                return;
+            }
+
+            install_host_feature_hooks();
         } @catch (NSException *e) {
             NSLog(@"[RaveApexCore] install_apex_hooks guarded exception: %@", e);
         }
     });
 }
+

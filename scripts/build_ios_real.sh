@@ -31,7 +31,14 @@ echo "clang:   $CLANG"
     -o build/RaveApexCore.dylib
 
 # Ship UNSIGNED so the install tool (Sideloadly) signs it with the app's identity.
+# `codesign --remove-signature` is unreliable on CI (the linker re-adds an ad-hoc
+# signature on arm64), so strip LC_CODE_SIGNATURE deterministically with our tool.
+# A left-over ad-hoc signature makes Sideloadly skip re-signing -> "code signature
+# invalid" at launch on-device. This guarantees the dylib is truly unsigned.
 codesign --remove-signature build/RaveApexCore.dylib 2>/dev/null || true
+python3 scripts/strip_sig.py build/RaveApexCore.dylib
+echo "=== post-strip verification ==="
+otool -l build/RaveApexCore.dylib 2>/dev/null | grep -c LC_CODE_SIGNATURE | sed 's/^/LC_CODE_SIGNATURE count: /'
 
 echo "=== Built build/RaveApexCore.dylib ==="
 file build/RaveApexCore.dylib || true

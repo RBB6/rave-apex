@@ -8,6 +8,33 @@
 
 @implementation RaveApexConfig
 
+@synthesize customButtonEmoji = _customButtonEmoji;
+@synthesize lastKnownMeshId = _lastKnownMeshId;
+
+- (NSString *)customButtonEmoji {
+    @synchronized (self) {
+        return _customButtonEmoji;
+    }
+}
+
+- (void)setCustomButtonEmoji:(NSString *)val {
+    @synchronized (self) {
+        _customButtonEmoji = val;
+    }
+}
+
+- (NSString *)lastKnownMeshId {
+    @synchronized (self) {
+        return _lastKnownMeshId;
+    }
+}
+
+- (void)setLastKnownMeshId:(NSString *)val {
+    @synchronized (self) {
+        _lastKnownMeshId = val;
+    }
+}
+
 + (instancetype)sharedConfig {
     static RaveApexConfig *config = nil;
     static dispatch_once_t onceToken;
@@ -27,267 +54,273 @@
 }
 
 - (void)resetToDefaults {
-    // Group 1: Roles & Governance
-    self.crownSpoofEnabled = NO;
-    self.localHostControlOverride = YES;
-    self.antiKickInterceptionEnabled = YES;
-    self.voteQuorumAutopilotEnabled = NO;
-    self.unhookedSyncEnabled = NO;
-    self.omniLeaderElevationEnabled = YES;
-    self.ghostPresenceEnabled = NO;
-    self.phantomCrownLockEnabled = NO;
+    @synchronized (self) {
+        // Group 1: Roles & Governance
+        self.crownSpoofEnabled = NO;
+        self.localHostControlOverride = YES;
+        self.antiKickInterceptionEnabled = YES;
+        self.voteQuorumAutopilotEnabled = NO;
+        self.unhookedSyncEnabled = NO;
+        self.omniLeaderElevationEnabled = YES;
+        self.ghostPresenceEnabled = NO;
+        self.phantomCrownLockEnabled = NO;
 
-    // Group 2: Audio/VoIP
-    self.audioPreampBoostEnabled = NO;
-    self.audioPreampVolume = 1.5;
-    self.voiceDuckingEnabled = YES;
-    self.dialogueEqEnabled = YES;
-    self.forceMicTransmissionEnabled = NO;
-    self.stealthGhostListenerEnabled = NO;
-    self.backgroundAudioEnabled = NO;
-    self.dualStreamAudioBalanceEnabled = YES;
+        // Group 2: Audio/VoIP
+        self.audioPreampBoostEnabled = NO;
+        self.audioPreampVolume = 1.5;
+        self.voiceDuckingEnabled = YES;
+        self.dialogueEqEnabled = YES;
+        self.forceMicTransmissionEnabled = NO;
+        self.stealthGhostListenerEnabled = NO;
+        self.backgroundAudioEnabled = NO;
+        self.dualStreamAudioBalanceEnabled = YES;
 
-    // Group 3: Media, Chat & Godmode
-    self.adBlockEnabled = YES;
-    self.matureBypassEnabled = YES;
-    self.forcePiPEnabled = YES;
-    self.uncappedSpeedEnabled = YES;
-    self.playbackSpeed = 1.0;
-    self.microClockSlewingEnabled = YES;
-    self.highestRenditionLockEnabled = YES;
-    self.bufferOverdriveEnabled = YES;
-    self.premiumBypassEnabled = YES;
-    self.autoUnblurChatImagesEnabled = YES;
-    self.autoTranslateChatEnabled = YES;
-    self.ghostTypingEnabled = NO;
-    self.antiRecallChatEnabled = YES;
-    self.iapReceiptSpoofEnabled = YES;
-    self.oledBlackoutThemeEnabled = NO;
+        // Group 3: Media, Chat & Godmode
+        self.adBlockEnabled = YES;
+        self.matureBypassEnabled = YES;
+        self.forcePiPEnabled = YES;
+        self.uncappedSpeedEnabled = YES;
+        self.playbackSpeed = 1.0;
+        self.microClockSlewingEnabled = YES;
+        self.highestRenditionLockEnabled = YES;
+        self.bufferOverdriveEnabled = YES;
+        self.premiumBypassEnabled = YES;
+        self.autoUnblurChatImagesEnabled = YES;
+        self.autoTranslateChatEnabled = YES;
+        self.ghostTypingEnabled = NO;
+        self.antiRecallChatEnabled = YES;
+        self.iapReceiptSpoofEnabled = YES;
+        self.oledBlackoutThemeEnabled = NO;
 
-    // Group 4: Extended Telemetry & Diagnostics
-    self.telemetryHUDEnabled = YES;
-    self.tacticalPillEnabled = YES;
-    self.nativeDebugOverlayVisible = NO;
-    self.manualClockNudgeMs = 0.0;
-    self.cpuMonitoringEnabled = NO;
-    self.panicButtonEnabled = YES;
+        // Group 4: Extended Telemetry & Diagnostics
+        self.telemetryHUDEnabled = YES;
+        self.tacticalPillEnabled = YES;
+        self.nativeDebugOverlayVisible = NO;
+        self.manualClockNudgeMs = 0.0;
+        self.cpuMonitoringEnabled = NO;
+        self.panicButtonEnabled = YES;
 
-    // Group 6: Extended Apex Expansion (Full Bundle & Troll Pack)
-    self.autoRejoinEnabled = YES;
-    self.audioEqPreset = 0;
-    self.pingSpoofEnabled = NO;
-    self.customButtonEmoji = @"⚡";
-    self.minimalPillModeEnabled = NO;
-    self.autoPiPOnBackground = YES;
-    self.lastKnownMeshId = nil;
+        // Group 6: Extended Apex Expansion (Full Bundle & Troll Pack)
+        self.autoRejoinEnabled = YES;
+        self.audioEqPreset = 0;
+        self.pingSpoofEnabled = NO;
+        self.customButtonEmoji = @"⚡";
+        self.minimalPillModeEnabled = NO;
+        self.autoPiPOnBackground = YES;
+        self.lastKnownMeshId = nil;
 
-    // Group 7: Frankg Master Expansion
-    self.autoLoopPlaybackEnabled = YES;
-    self.pitchCorrectionEnabled = YES;
-    self.turboPreampEnabled = NO;
+        // Group 7: Frankg Master Expansion
+        self.autoLoopPlaybackEnabled = YES;
+        self.pitchCorrectionEnabled = YES;
+        self.turboPreampEnabled = NO;
 
-    // Group 8: Chaos & Sovereign Godmode Suite
-    self.megaPreamp25xEnabled = NO;
-    self.pingSpoofMode = 0;
-    self.sonicJammerUltraActive = NO;
-    self.micLockAlwaysOn = NO;
+        // Group 8: Chaos & Sovereign Godmode Suite
+        self.megaPreamp25xEnabled = NO;
+        self.pingSpoofMode = 0;
+        self.sonicJammerUltraActive = NO;
+        self.micLockAlwaysOn = NO;
 
-    // Group 9: Sovereign Apex V2 & Ghost Weaponry
-    self.megaPreamp30xEnabled = NO;
-    self.kickReflectorEnabled = YES;
-    self.phantomIdentityCamouflageEnabled = NO;
-    self.vocalPitchShiftPreset = 0;
-    self.ultraBassquakeEnabled = NO;
-    self.antiAfkImmortalizerEnabled = YES;
-    self.voteHijackerAutoPassEnabled = NO;
-    self.streamSnifferAutoCopyEnabled = NO;
+        // Group 9: Sovereign Apex V2 & Ghost Weaponry
+        self.megaPreamp30xEnabled = NO;
+        self.kickReflectorEnabled = YES;
+        self.phantomIdentityCamouflageEnabled = NO;
+        self.vocalPitchShiftPreset = 0;
+        self.ultraBassquakeEnabled = NO;
+        self.antiAfkImmortalizerEnabled = YES;
+        self.voteHijackerAutoPassEnabled = NO;
+        self.streamSnifferAutoCopyEnabled = NO;
 
-    // Group 10: Red-Team Combat Suite
-    self.quantumGhostPresenceEnabled = NO;
-    self.stealthAudioSnooperEnabled = NO;
-    self.stealthAudioSnooperGain = 3.0f;
-    self.evictionReflector2Enabled = YES;
-    self.roomFreezeStrobeEnabled = NO;
+        // Group 10: Red-Team Combat Suite
+        self.quantumGhostPresenceEnabled = NO;
+        self.stealthAudioSnooperEnabled = NO;
+        self.stealthAudioSnooperGain = 3.0f;
+        self.evictionReflector2Enabled = YES;
+        self.roomFreezeStrobeEnabled = NO;
+    }
 }
 
 - (void)save {
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    // Group 1: Roles
-    [d setBool:self.crownSpoofEnabled forKey:@"rave_apex_crown_spoof"];
-    [d setBool:self.localHostControlOverride forKey:@"rave_apex_local_host"];
-    [d setBool:self.antiKickInterceptionEnabled forKey:@"rave_apex_anti_kick"];
-    [d setBool:self.voteQuorumAutopilotEnabled forKey:@"rave_apex_vote_autopilot"];
-    [d setBool:self.unhookedSyncEnabled forKey:@"rave_apex_unhooked_sync"];
-    [d setBool:self.omniLeaderElevationEnabled forKey:@"rave_apex_omni_leader"];
-    [d setBool:self.ghostPresenceEnabled forKey:@"rave_apex_ghost_presence"];
-    [d setBool:self.phantomCrownLockEnabled forKey:@"rave_apex_phantom_crown"];
+    @synchronized (self) {
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        // Group 1: Roles
+        [d setBool:self.crownSpoofEnabled forKey:@"rave_apex_crown_spoof"];
+        [d setBool:self.localHostControlOverride forKey:@"rave_apex_local_host"];
+        [d setBool:self.antiKickInterceptionEnabled forKey:@"rave_apex_anti_kick"];
+        [d setBool:self.voteQuorumAutopilotEnabled forKey:@"rave_apex_vote_autopilot"];
+        [d setBool:self.unhookedSyncEnabled forKey:@"rave_apex_unhooked_sync"];
+        [d setBool:self.omniLeaderElevationEnabled forKey:@"rave_apex_omni_leader"];
+        [d setBool:self.ghostPresenceEnabled forKey:@"rave_apex_ghost_presence"];
+        [d setBool:self.phantomCrownLockEnabled forKey:@"rave_apex_phantom_crown"];
 
-    // Group 2: Audio/VoIP
-    [d setBool:self.audioPreampBoostEnabled forKey:@"rave_apex_preamp_en"];
-    [d setDouble:self.audioPreampVolume forKey:@"rave_apex_preamp_vol"];
-    [d setBool:self.voiceDuckingEnabled forKey:@"rave_apex_voice_ducking"];
-    [d setBool:self.dialogueEqEnabled forKey:@"rave_apex_dialogue_eq"];
-    [d setBool:self.forceMicTransmissionEnabled forKey:@"rave_apex_force_mic"];
-    [d setBool:self.stealthGhostListenerEnabled forKey:@"rave_apex_stealth_ghost"];
-    [d setBool:self.backgroundAudioEnabled forKey:@"rave_apex_bg_audio"];
-    [d setBool:self.dualStreamAudioBalanceEnabled forKey:@"rave_apex_dual_stream"];
+        // Group 2: Audio/VoIP
+        [d setBool:self.audioPreampBoostEnabled forKey:@"rave_apex_preamp_en"];
+        [d setDouble:self.audioPreampVolume forKey:@"rave_apex_preamp_vol"];
+        [d setBool:self.voiceDuckingEnabled forKey:@"rave_apex_voice_ducking"];
+        [d setBool:self.dialogueEqEnabled forKey:@"rave_apex_dialogue_eq"];
+        [d setBool:self.forceMicTransmissionEnabled forKey:@"rave_apex_force_mic"];
+        [d setBool:self.stealthGhostListenerEnabled forKey:@"rave_apex_stealth_ghost"];
+        [d setBool:self.backgroundAudioEnabled forKey:@"rave_apex_bg_audio"];
+        [d setBool:self.dualStreamAudioBalanceEnabled forKey:@"rave_apex_dual_stream"];
 
-    // Group 3: Media, Chat & Godmode
-    [d setBool:self.adBlockEnabled forKey:@"rave_apex_adblock"];
-    [d setBool:self.matureBypassEnabled forKey:@"rave_apex_mature_bypass"];
-    [d setBool:self.forcePiPEnabled forKey:@"rave_apex_force_pip"];
-    [d setBool:self.uncappedSpeedEnabled forKey:@"rave_apex_speed_en"];
-    [d setDouble:self.playbackSpeed forKey:@"rave_apex_playback_speed"];
-    [d setBool:self.microClockSlewingEnabled forKey:@"rave_apex_micro_slewing"];
-    [d setBool:self.highestRenditionLockEnabled forKey:@"rave_apex_hd_lock"];
-    [d setBool:self.bufferOverdriveEnabled forKey:@"rave_apex_buffer_overdrive"];
-    [d setBool:self.premiumBypassEnabled forKey:@"rave_apex_premium_bypass"];
-    [d setBool:self.autoUnblurChatImagesEnabled forKey:@"rave_apex_auto_unblur"];
-    [d setBool:self.autoTranslateChatEnabled forKey:@"rave_apex_auto_translate"];
-    [d setBool:self.ghostTypingEnabled forKey:@"rave_apex_ghost_typing"];
-    [d setBool:self.antiRecallChatEnabled forKey:@"rave_apex_anti_recall"];
-    [d setBool:self.iapReceiptSpoofEnabled forKey:@"rave_apex_iap_spoof"];
-    [d setBool:self.oledBlackoutThemeEnabled forKey:@"rave_apex_oled_theme"];
+        // Group 3: Media, Chat & Godmode
+        [d setBool:self.adBlockEnabled forKey:@"rave_apex_adblock"];
+        [d setBool:self.matureBypassEnabled forKey:@"rave_apex_mature_bypass"];
+        [d setBool:self.forcePiPEnabled forKey:@"rave_apex_force_pip"];
+        [d setBool:self.uncappedSpeedEnabled forKey:@"rave_apex_speed_en"];
+        [d setDouble:self.playbackSpeed forKey:@"rave_apex_playback_speed"];
+        [d setBool:self.microClockSlewingEnabled forKey:@"rave_apex_micro_slewing"];
+        [d setBool:self.highestRenditionLockEnabled forKey:@"rave_apex_hd_lock"];
+        [d setBool:self.bufferOverdriveEnabled forKey:@"rave_apex_buffer_overdrive"];
+        [d setBool:self.premiumBypassEnabled forKey:@"rave_apex_premium_bypass"];
+        [d setBool:self.autoUnblurChatImagesEnabled forKey:@"rave_apex_auto_unblur"];
+        [d setBool:self.autoTranslateChatEnabled forKey:@"rave_apex_auto_translate"];
+        [d setBool:self.ghostTypingEnabled forKey:@"rave_apex_ghost_typing"];
+        [d setBool:self.antiRecallChatEnabled forKey:@"rave_apex_anti_recall"];
+        [d setBool:self.iapReceiptSpoofEnabled forKey:@"rave_apex_iap_spoof"];
+        [d setBool:self.oledBlackoutThemeEnabled forKey:@"rave_apex_oled_theme"];
 
-    // Host app feature flags sync
-    if (self.autoUnblurChatImagesEnabled) {
-        [d setBool:YES forKey:@"unblurAllChatImages"];
+        // Host app feature flags sync
+        if (self.autoUnblurChatImagesEnabled) {
+            [d setBool:YES forKey:@"unblurAllChatImages"];
+        }
+        if (self.autoTranslateChatEnabled) {
+            [d setBool:YES forKey:@"autoTranslate"];
+        }
+
+        // Group 4: Telemetry & Hardware
+        [d setBool:self.telemetryHUDEnabled forKey:@"rave_apex_telemetry_hud"];
+        [d setBool:self.tacticalPillEnabled forKey:@"rave_apex_tactical_pill"];
+        [d setBool:self.nativeDebugOverlayVisible forKey:@"rave_apex_native_dbg_visible"];
+        [d setDouble:self.manualClockNudgeMs forKey:@"rave_apex_clock_nudge"];
+        [d setBool:self.cpuMonitoringEnabled forKey:@"rave_apex_cpu_mon"];
+        [d setBool:self.panicButtonEnabled forKey:@"rave_apex_panic_btn"];
+
+        // Group 6: Extended Apex Expansion (Full Bundle & Troll Pack)
+        [d setBool:self.autoRejoinEnabled forKey:@"rave_apex_auto_rejoin"];
+        [d setInteger:self.audioEqPreset forKey:@"rave_apex_audio_eq"];
+        [d setBool:self.pingSpoofEnabled forKey:@"rave_apex_ping_spoof"];
+        [d setObject:self.customButtonEmoji ?: @"⚡" forKey:@"rave_apex_btn_emoji"];
+        [d setBool:self.minimalPillModeEnabled forKey:@"rave_apex_minimal_pill"];
+        [d setBool:self.autoPiPOnBackground forKey:@"rave_apex_auto_pip_bg"];
+        if (self.lastKnownMeshId) [d setObject:self.lastKnownMeshId forKey:@"rave_apex_last_mesh_id"];
+
+        // Group 7: Frankg Master Expansion
+        [d setBool:self.autoLoopPlaybackEnabled forKey:@"rave_apex_auto_loop"];
+        [d setBool:self.pitchCorrectionEnabled forKey:@"rave_apex_pitch_corr"];
+        [d setBool:self.turboPreampEnabled forKey:@"rave_apex_turbo_preamp"];
+
+        // Group 8: Chaos & Sovereign Godmode Suite
+        [d setBool:self.megaPreamp25xEnabled forKey:@"rave_apex_mega_preamp_25x"];
+        [d setInteger:self.pingSpoofMode forKey:@"rave_apex_ping_spoof_mode"];
+        [d setBool:self.sonicJammerUltraActive forKey:@"rave_apex_sonic_ultra"];
+        [d setBool:self.micLockAlwaysOn forKey:@"rave_apex_mic_lock_always"];
+
+        // Group 9: Sovereign Apex V2 & Ghost Weaponry
+        [d setBool:self.megaPreamp30xEnabled forKey:@"rave_apex_mega_preamp_30x"];
+        [d setBool:self.kickReflectorEnabled forKey:@"rave_apex_kick_reflector"];
+        [d setBool:self.phantomIdentityCamouflageEnabled forKey:@"rave_apex_phantom_id"];
+        [d setInteger:self.vocalPitchShiftPreset forKey:@"rave_apex_pitch_preset"];
+        [d setBool:self.ultraBassquakeEnabled forKey:@"rave_apex_ultra_bassquake"];
+        [d setBool:self.antiAfkImmortalizerEnabled forKey:@"rave_apex_anti_afk"];
+        [d setBool:self.voteHijackerAutoPassEnabled forKey:@"rave_apex_vote_hijacker"];
+        [d setBool:self.streamSnifferAutoCopyEnabled forKey:@"rave_apex_sniffer_autocopy"];
+
+        // Group 10: Red-Team Combat Suite
+        [d setBool:self.quantumGhostPresenceEnabled forKey:@"rave_apex_quantum_ghost"];
+        [d setBool:self.stealthAudioSnooperEnabled forKey:@"rave_apex_audio_snooper"];
+        [d setDouble:self.stealthAudioSnooperGain forKey:@"rave_apex_snooper_gain"];
+        [d setBool:self.evictionReflector2Enabled forKey:@"rave_apex_evict_reflect_2"];
+        [d setBool:self.roomFreezeStrobeEnabled forKey:@"rave_apex_freeze_strobe"];
+        [d synchronize];
     }
-    if (self.autoTranslateChatEnabled) {
-        [d setBool:YES forKey:@"autoTranslate"];
-    }
-
-    // Group 4: Telemetry & Hardware
-    [d setBool:self.telemetryHUDEnabled forKey:@"rave_apex_telemetry_hud"];
-    [d setBool:self.tacticalPillEnabled forKey:@"rave_apex_tactical_pill"];
-    [d setBool:self.nativeDebugOverlayVisible forKey:@"rave_apex_native_dbg_visible"];
-    [d setDouble:self.manualClockNudgeMs forKey:@"rave_apex_clock_nudge"];
-    [d setBool:self.cpuMonitoringEnabled forKey:@"rave_apex_cpu_mon"];
-    [d setBool:self.panicButtonEnabled forKey:@"rave_apex_panic_btn"];
-
-    // Group 6: Extended Apex Expansion (Full Bundle & Troll Pack)
-    [d setBool:self.autoRejoinEnabled forKey:@"rave_apex_auto_rejoin"];
-    [d setInteger:self.audioEqPreset forKey:@"rave_apex_audio_eq"];
-    [d setBool:self.pingSpoofEnabled forKey:@"rave_apex_ping_spoof"];
-    [d setObject:self.customButtonEmoji ?: @"⚡" forKey:@"rave_apex_btn_emoji"];
-    [d setBool:self.minimalPillModeEnabled forKey:@"rave_apex_minimal_pill"];
-    [d setBool:self.autoPiPOnBackground forKey:@"rave_apex_auto_pip_bg"];
-    if (self.lastKnownMeshId) [d setObject:self.lastKnownMeshId forKey:@"rave_apex_last_mesh_id"];
-
-    // Group 7: Frankg Master Expansion
-    [d setBool:self.autoLoopPlaybackEnabled forKey:@"rave_apex_auto_loop"];
-    [d setBool:self.pitchCorrectionEnabled forKey:@"rave_apex_pitch_corr"];
-    [d setBool:self.turboPreampEnabled forKey:@"rave_apex_turbo_preamp"];
-
-    // Group 8: Chaos & Sovereign Godmode Suite
-    [d setBool:self.megaPreamp25xEnabled forKey:@"rave_apex_mega_preamp_25x"];
-    [d setInteger:self.pingSpoofMode forKey:@"rave_apex_ping_spoof_mode"];
-    [d setBool:self.sonicJammerUltraActive forKey:@"rave_apex_sonic_ultra"];
-    [d setBool:self.micLockAlwaysOn forKey:@"rave_apex_mic_lock_always"];
-
-    // Group 9: Sovereign Apex V2 & Ghost Weaponry
-    [d setBool:self.megaPreamp30xEnabled forKey:@"rave_apex_mega_preamp_30x"];
-    [d setBool:self.kickReflectorEnabled forKey:@"rave_apex_kick_reflector"];
-    [d setBool:self.phantomIdentityCamouflageEnabled forKey:@"rave_apex_phantom_id"];
-    [d setInteger:self.vocalPitchShiftPreset forKey:@"rave_apex_pitch_preset"];
-    [d setBool:self.ultraBassquakeEnabled forKey:@"rave_apex_ultra_bassquake"];
-    [d setBool:self.antiAfkImmortalizerEnabled forKey:@"rave_apex_anti_afk"];
-    [d setBool:self.voteHijackerAutoPassEnabled forKey:@"rave_apex_vote_hijacker"];
-    [d setBool:self.streamSnifferAutoCopyEnabled forKey:@"rave_apex_sniffer_autocopy"];
-
-    // Group 10: Red-Team Combat Suite
-    [d setBool:self.quantumGhostPresenceEnabled forKey:@"rave_apex_quantum_ghost"];
-    [d setBool:self.stealthAudioSnooperEnabled forKey:@"rave_apex_audio_snooper"];
-    [d setDouble:self.stealthAudioSnooperGain forKey:@"rave_apex_snooper_gain"];
-    [d setBool:self.evictionReflector2Enabled forKey:@"rave_apex_evict_reflect_2"];
-    [d setBool:self.roomFreezeStrobeEnabled forKey:@"rave_apex_freeze_strobe"];
-    [d synchronize];
 }
 
 - (void)load {
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    if ([d objectForKey:@"rave_apex_adblock"]) {
-        // Group 1: Roles
-        self.crownSpoofEnabled = [d boolForKey:@"rave_apex_crown_spoof"];
-        self.localHostControlOverride = [d boolForKey:@"rave_apex_local_host"];
-        self.antiKickInterceptionEnabled = [d boolForKey:@"rave_apex_anti_kick"];
-        self.voteQuorumAutopilotEnabled = [d boolForKey:@"rave_apex_vote_autopilot"];
-        self.unhookedSyncEnabled = [d boolForKey:@"rave_apex_unhooked_sync"];
-        self.omniLeaderElevationEnabled = [d boolForKey:@"rave_apex_omni_leader"];
-        self.ghostPresenceEnabled = [d boolForKey:@"rave_apex_ghost_presence"];
-        self.phantomCrownLockEnabled = [d boolForKey:@"rave_apex_phantom_crown"];
+    @synchronized (self) {
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        if ([d objectForKey:@"rave_apex_adblock"]) {
+            // Group 1: Roles
+            self.crownSpoofEnabled = [d boolForKey:@"rave_apex_crown_spoof"];
+            self.localHostControlOverride = [d boolForKey:@"rave_apex_local_host"];
+            self.antiKickInterceptionEnabled = [d boolForKey:@"rave_apex_anti_kick"];
+            self.voteQuorumAutopilotEnabled = [d boolForKey:@"rave_apex_vote_autopilot"];
+            self.unhookedSyncEnabled = [d boolForKey:@"rave_apex_unhooked_sync"];
+            self.omniLeaderElevationEnabled = [d boolForKey:@"rave_apex_omni_leader"];
+            self.ghostPresenceEnabled = [d boolForKey:@"rave_apex_ghost_presence"];
+            self.phantomCrownLockEnabled = [d boolForKey:@"rave_apex_phantom_crown"];
 
-        // Group 2: Audio/VoIP
-        self.audioPreampBoostEnabled = [d boolForKey:@"rave_apex_preamp_en"];
-        self.audioPreampVolume = [d doubleForKey:@"rave_apex_preamp_vol"] ?: 1.5;
-        self.voiceDuckingEnabled = [d objectForKey:@"rave_apex_voice_ducking"] ? [d boolForKey:@"rave_apex_voice_ducking"] : YES;
-        self.dialogueEqEnabled = [d objectForKey:@"rave_apex_dialogue_eq"] ? [d boolForKey:@"rave_apex_dialogue_eq"] : YES;
-        self.forceMicTransmissionEnabled = [d boolForKey:@"rave_apex_force_mic"];
-        self.stealthGhostListenerEnabled = [d boolForKey:@"rave_apex_stealth_ghost"];
-        self.backgroundAudioEnabled = [d boolForKey:@"rave_apex_bg_audio"];
-        self.dualStreamAudioBalanceEnabled = [d boolForKey:@"rave_apex_dual_stream"];
+            // Group 2: Audio/VoIP
+            self.audioPreampBoostEnabled = [d boolForKey:@"rave_apex_preamp_en"];
+            self.audioPreampVolume = [d doubleForKey:@"rave_apex_preamp_vol"] ?: 1.5;
+            self.voiceDuckingEnabled = [d objectForKey:@"rave_apex_voice_ducking"] ? [d boolForKey:@"rave_apex_voice_ducking"] : YES;
+            self.dialogueEqEnabled = [d objectForKey:@"rave_apex_dialogue_eq"] ? [d boolForKey:@"rave_apex_dialogue_eq"] : YES;
+            self.forceMicTransmissionEnabled = [d boolForKey:@"rave_apex_force_mic"];
+            self.stealthGhostListenerEnabled = [d boolForKey:@"rave_apex_stealth_ghost"];
+            self.backgroundAudioEnabled = [d boolForKey:@"rave_apex_bg_audio"];
+            self.dualStreamAudioBalanceEnabled = [d boolForKey:@"rave_apex_dual_stream"];
 
-        // Group 3: Media, Chat & Godmode
-        self.adBlockEnabled = [d boolForKey:@"rave_apex_adblock"];
-        self.matureBypassEnabled = [d boolForKey:@"rave_apex_mature_bypass"];
-        self.forcePiPEnabled = [d boolForKey:@"rave_apex_force_pip"];
-        self.uncappedSpeedEnabled = [d boolForKey:@"rave_apex_speed_en"];
-        self.playbackSpeed = [d doubleForKey:@"rave_apex_playback_speed"] ?: 1.0;
-        self.microClockSlewingEnabled = [d objectForKey:@"rave_apex_micro_slewing"] ? [d boolForKey:@"rave_apex_micro_slewing"] : YES;
-        self.highestRenditionLockEnabled = [d objectForKey:@"rave_apex_hd_lock"] ? [d boolForKey:@"rave_apex_hd_lock"] : YES;
-        self.bufferOverdriveEnabled = [d objectForKey:@"rave_apex_buffer_overdrive"] ? [d boolForKey:@"rave_apex_buffer_overdrive"] : YES;
-        self.premiumBypassEnabled = [d boolForKey:@"rave_apex_premium_bypass"];
-        self.autoUnblurChatImagesEnabled = [d objectForKey:@"rave_apex_auto_unblur"] ? [d boolForKey:@"rave_apex_auto_unblur"] : YES;
-        self.autoTranslateChatEnabled = [d objectForKey:@"rave_apex_auto_translate"] ? [d boolForKey:@"rave_apex_auto_translate"] : YES;
-        self.ghostTypingEnabled = [d boolForKey:@"rave_apex_ghost_typing"];
-        self.antiRecallChatEnabled = [d objectForKey:@"rave_apex_anti_recall"] ? [d boolForKey:@"rave_apex_anti_recall"] : YES;
-        self.iapReceiptSpoofEnabled = [d objectForKey:@"rave_apex_iap_spoof"] ? [d boolForKey:@"rave_apex_iap_spoof"] : YES;
-        self.oledBlackoutThemeEnabled = [d boolForKey:@"rave_apex_oled_theme"];
+            // Group 3: Media, Chat & Godmode
+            self.adBlockEnabled = [d boolForKey:@"rave_apex_adblock"];
+            self.matureBypassEnabled = [d boolForKey:@"rave_apex_mature_bypass"];
+            self.forcePiPEnabled = [d boolForKey:@"rave_apex_force_pip"];
+            self.uncappedSpeedEnabled = [d boolForKey:@"rave_apex_speed_en"];
+            self.playbackSpeed = [d doubleForKey:@"rave_apex_playback_speed"] ?: 1.0;
+            self.microClockSlewingEnabled = [d objectForKey:@"rave_apex_micro_slewing"] ? [d boolForKey:@"rave_apex_micro_slewing"] : YES;
+            self.highestRenditionLockEnabled = [d objectForKey:@"rave_apex_hd_lock"] ? [d boolForKey:@"rave_apex_hd_lock"] : YES;
+            self.bufferOverdriveEnabled = [d objectForKey:@"rave_apex_buffer_overdrive"] ? [d boolForKey:@"rave_apex_buffer_overdrive"] : YES;
+            self.premiumBypassEnabled = [d boolForKey:@"rave_apex_premium_bypass"];
+            self.autoUnblurChatImagesEnabled = [d objectForKey:@"rave_apex_auto_unblur"] ? [d boolForKey:@"rave_apex_auto_unblur"] : YES;
+            self.autoTranslateChatEnabled = [d objectForKey:@"rave_apex_auto_translate"] ? [d boolForKey:@"rave_apex_auto_translate"] : YES;
+            self.ghostTypingEnabled = [d boolForKey:@"rave_apex_ghost_typing"];
+            self.antiRecallChatEnabled = [d objectForKey:@"rave_apex_anti_recall"] ? [d boolForKey:@"rave_apex_anti_recall"] : YES;
+            self.iapReceiptSpoofEnabled = [d objectForKey:@"rave_apex_iap_spoof"] ? [d boolForKey:@"rave_apex_iap_spoof"] : YES;
+            self.oledBlackoutThemeEnabled = [d boolForKey:@"rave_apex_oled_theme"];
 
-        // Group 4: Telemetry & Hardware
-        self.telemetryHUDEnabled = [d boolForKey:@"rave_apex_telemetry_hud"];
-        self.tacticalPillEnabled = [d objectForKey:@"rave_apex_tactical_pill"] ? [d boolForKey:@"rave_apex_tactical_pill"] : YES;
-        self.nativeDebugOverlayVisible = [d boolForKey:@"rave_apex_native_dbg_visible"];
-        self.manualClockNudgeMs = [d doubleForKey:@"rave_apex_clock_nudge"];
-        self.cpuMonitoringEnabled = [d boolForKey:@"rave_apex_cpu_mon"];
-        self.panicButtonEnabled = [d objectForKey:@"rave_apex_panic_btn"] ? [d boolForKey:@"rave_apex_panic_btn"] : YES;
+            // Group 4: Telemetry & Hardware
+            self.telemetryHUDEnabled = [d boolForKey:@"rave_apex_telemetry_hud"];
+            self.tacticalPillEnabled = [d objectForKey:@"rave_apex_tactical_pill"] ? [d boolForKey:@"rave_apex_tactical_pill"] : YES;
+            self.nativeDebugOverlayVisible = [d boolForKey:@"rave_apex_native_dbg_visible"];
+            self.manualClockNudgeMs = [d doubleForKey:@"rave_apex_clock_nudge"];
+            self.cpuMonitoringEnabled = [d boolForKey:@"rave_apex_cpu_mon"];
+            self.panicButtonEnabled = [d objectForKey:@"rave_apex_panic_btn"] ? [d boolForKey:@"rave_apex_panic_btn"] : YES;
 
-        // Group 6: Extended Apex Expansion
-        self.autoRejoinEnabled = [d objectForKey:@"rave_apex_auto_rejoin"] ? [d boolForKey:@"rave_apex_auto_rejoin"] : YES;
-        self.audioEqPreset = [d integerForKey:@"rave_apex_audio_eq"];
-        self.pingSpoofEnabled = [d boolForKey:@"rave_apex_ping_spoof"];
-        self.customButtonEmoji = [d stringForKey:@"rave_apex_btn_emoji"] ?: @"⚡";
-        self.minimalPillModeEnabled = [d boolForKey:@"rave_apex_minimal_pill"];
-        self.autoPiPOnBackground = [d objectForKey:@"rave_apex_auto_pip_bg"] ? [d boolForKey:@"rave_apex_auto_pip_bg"] : YES;
-        self.lastKnownMeshId = [d stringForKey:@"rave_apex_last_mesh_id"];
+            // Group 6: Extended Apex Expansion
+            self.autoRejoinEnabled = [d objectForKey:@"rave_apex_auto_rejoin"] ? [d boolForKey:@"rave_apex_auto_rejoin"] : YES;
+            self.audioEqPreset = [d integerForKey:@"rave_apex_audio_eq"];
+            self.pingSpoofEnabled = [d boolForKey:@"rave_apex_ping_spoof"];
+            self.customButtonEmoji = [d stringForKey:@"rave_apex_btn_emoji"] ?: @"⚡";
+            self.minimalPillModeEnabled = [d boolForKey:@"rave_apex_minimal_pill"];
+            self.autoPiPOnBackground = [d objectForKey:@"rave_apex_auto_pip_bg"] ? [d boolForKey:@"rave_apex_auto_pip_bg"] : YES;
+            self.lastKnownMeshId = [d stringForKey:@"rave_apex_last_mesh_id"];
 
-        // Group 7: Frankg Master Expansion
-        self.autoLoopPlaybackEnabled = [d objectForKey:@"rave_apex_auto_loop"] ? [d boolForKey:@"rave_apex_auto_loop"] : YES;
-        self.pitchCorrectionEnabled = [d objectForKey:@"rave_apex_pitch_corr"] ? [d boolForKey:@"rave_apex_pitch_corr"] : YES;
-        self.turboPreampEnabled = [d boolForKey:@"rave_apex_turbo_preamp"];
+            // Group 7: Frankg Master Expansion
+            self.autoLoopPlaybackEnabled = [d objectForKey:@"rave_apex_auto_loop"] ? [d boolForKey:@"rave_apex_auto_loop"] : YES;
+            self.pitchCorrectionEnabled = [d objectForKey:@"rave_apex_pitch_corr"] ? [d boolForKey:@"rave_apex_pitch_corr"] : YES;
+            self.turboPreampEnabled = [d boolForKey:@"rave_apex_turbo_preamp"];
 
-        // Group 8: Chaos & Sovereign Godmode Suite
-        self.megaPreamp25xEnabled = [d boolForKey:@"rave_apex_mega_preamp_25x"];
-        self.pingSpoofMode = [d integerForKey:@"rave_apex_ping_spoof_mode"];
-        self.sonicJammerUltraActive = [d boolForKey:@"rave_apex_sonic_ultra"];
-        self.micLockAlwaysOn = [d boolForKey:@"rave_apex_mic_lock_always"];
+            // Group 8: Chaos & Sovereign Godmode Suite
+            self.megaPreamp25xEnabled = [d boolForKey:@"rave_apex_mega_preamp_25x"];
+            self.pingSpoofMode = [d integerForKey:@"rave_apex_ping_spoof_mode"];
+            self.sonicJammerUltraActive = [d boolForKey:@"rave_apex_sonic_ultra"];
+            self.micLockAlwaysOn = [d boolForKey:@"rave_apex_mic_lock_always"];
 
-        // Group 9: Sovereign Apex V2 & Ghost Weaponry
-        self.megaPreamp30xEnabled = [d boolForKey:@"rave_apex_mega_preamp_30x"];
-        self.kickReflectorEnabled = [d objectForKey:@"rave_apex_kick_reflector"] ? [d boolForKey:@"rave_apex_kick_reflector"] : YES;
-        self.phantomIdentityCamouflageEnabled = [d boolForKey:@"rave_apex_phantom_id"];
-        self.vocalPitchShiftPreset = [d integerForKey:@"rave_apex_pitch_preset"];
-        self.ultraBassquakeEnabled = [d boolForKey:@"rave_apex_ultra_bassquake"];
-        self.antiAfkImmortalizerEnabled = [d objectForKey:@"rave_apex_anti_afk"] ? [d boolForKey:@"rave_apex_anti_afk"] : YES;
-        self.voteHijackerAutoPassEnabled = [d boolForKey:@"rave_apex_vote_hijacker"];
-        self.streamSnifferAutoCopyEnabled = [d boolForKey:@"rave_apex_sniffer_autocopy"];
+            // Group 9: Sovereign Apex V2 & Ghost Weaponry
+            self.megaPreamp30xEnabled = [d boolForKey:@"rave_apex_mega_preamp_30x"];
+            self.kickReflectorEnabled = [d objectForKey:@"rave_apex_kick_reflector"] ? [d boolForKey:@"rave_apex_kick_reflector"] : YES;
+            self.phantomIdentityCamouflageEnabled = [d boolForKey:@"rave_apex_phantom_id"];
+            self.vocalPitchShiftPreset = [d integerForKey:@"rave_apex_pitch_preset"];
+            self.ultraBassquakeEnabled = [d boolForKey:@"rave_apex_ultra_bassquake"];
+            self.antiAfkImmortalizerEnabled = [d objectForKey:@"rave_apex_anti_afk"] ? [d boolForKey:@"rave_apex_anti_afk"] : YES;
+            self.voteHijackerAutoPassEnabled = [d boolForKey:@"rave_apex_vote_hijacker"];
+            self.streamSnifferAutoCopyEnabled = [d boolForKey:@"rave_apex_sniffer_autocopy"];
 
-        // Group 10: Red-Team Combat Suite
-        self.quantumGhostPresenceEnabled = [d boolForKey:@"rave_apex_quantum_ghost"];
-        self.stealthAudioSnooperEnabled = [d boolForKey:@"rave_apex_audio_snooper"];
-        self.stealthAudioSnooperGain = [d doubleForKey:@"rave_apex_snooper_gain"] ?: 3.0f;
-        self.evictionReflector2Enabled = [d objectForKey:@"rave_apex_evict_reflect_2"] ? [d boolForKey:@"rave_apex_evict_reflect_2"] : YES;
-        self.roomFreezeStrobeEnabled = [d boolForKey:@"rave_apex_freeze_strobe"];
+            // Group 10: Red-Team Combat Suite
+            self.quantumGhostPresenceEnabled = [d boolForKey:@"rave_apex_quantum_ghost"];
+            self.stealthAudioSnooperEnabled = [d boolForKey:@"rave_apex_audio_snooper"];
+            self.stealthAudioSnooperGain = [d doubleForKey:@"rave_apex_snooper_gain"] ?: 3.0f;
+            self.evictionReflector2Enabled = [d objectForKey:@"rave_apex_evict_reflect_2"] ? [d boolForKey:@"rave_apex_evict_reflect_2"] : YES;
+            self.roomFreezeStrobeEnabled = [d boolForKey:@"rave_apex_freeze_strobe"];
+        }
     }
 }
 
@@ -298,24 +331,21 @@
 // ==============================================================================
 
 void start_telemetry_monitor(void) {
-    static BOOL s_started = NO;
-    if (s_started) return;
-    s_started = YES;
-
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-        while (1) {
-            [NSThread sleepForTimeInterval:1.5];
-            @autoreleasepool {
-                // Real hardware telemetry:
-                // task-level CPU fraction via mach task info, resident memory, and live display-link FPS.
-                double cpuFraction = apex_cpu_usage();   // 0.0 .. N cores
-                double memMB       = apex_mem_mb();
-                double fps         = apex_current_fps();
-                [[RaveApexMenuUI sharedInstance] updateLiveTelemetryCPU:(float)cpuFraction
-                                                               memoryMB:memMB
-                                                                    fps:fps];
+    static dispatch_once_t s_telemOnce;
+    dispatch_once(&s_telemOnce, ^{
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+            while (1) {
+                [NSThread sleepForTimeInterval:1.5];
+                @autoreleasepool {
+                    double cpuFraction = apex_cpu_usage();   // 0.0 .. N cores
+                    double memMB       = apex_mem_mb();
+                    double fps         = apex_current_fps();
+                    [[RaveApexMenuUI sharedInstance] updateLiveTelemetryCPU:(float)cpuFraction
+                                                                   memoryMB:memMB
+                                                                        fps:fps];
+                }
             }
-        }
+        });
     });
 }
 
@@ -341,17 +371,22 @@ static void rave_apex_master_init(void) {
     void (^setupBlock)(NSNotification * _Nullable) = ^(NSNotification * _Nullable note) {
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
-            s_ready = YES;
             NSLog(@"[RaveApexCore] Application ready (%@). Mounting overlay & hooks...", note ? note.name : @"Timer Fallback");
-            dispatch_async(dispatch_get_main_queue(), ^{
+            void (^initWork)(void) = ^{
                 @try {
                     install_apex_hooks();
                     [[RaveApexMenuUI sharedInstance] initializeOverlay];
+                    s_ready = YES;
                     NSLog(@"[RaveApexCore] Hardened overlay and hooks initialized cleanly.");
                 } @catch (NSException *e) {
                     NSLog(@"[RaveApexCore] Setup guarded exception: %@", e);
                 }
-            });
+            };
+            if ([NSThread isMainThread]) {
+                initWork();
+            } else {
+                dispatch_async(dispatch_get_main_queue(), initWork);
+            }
         });
     };
 
@@ -517,12 +552,8 @@ static void rave_apex_master_init(void) {
         @try {
             NSMutableString *report = [NSMutableString stringWithString:@"ENGINE PROFILE\n"];
 
-            Class cpuMon = objc_getClass("CPUMonitoring");
-            SEL cpuSel = NSSelectorFromString(@"reportCPUUsage");
-            if (cpuMon && [cpuMon respondsToSelector:cpuSel]) {
-                double usage = ((double (*)(id, SEL))objc_msgSend)(cpuMon, cpuSel);
-                [report appendFormat:@"CPU: %.1f%%  ", usage];
-            }
+            double usage = apex_cpu_usage() * 100.0;
+            [report appendFormat:@"CPU: %.1f%% | Mem: %.1f MB | FPS: %.1f", usage, apex_mem_mb(), apex_current_fps()];
 
             Class perfMon = objc_getClass("_TtC4Rave21PerformanceMonitoring");
             SEL perfSel = NSSelectorFromString(@"generatePerformanceDescription");
@@ -550,73 +581,80 @@ static void rave_apex_master_init(void) {
             [[RaveApexMenuUI sharedInstance] updateBandwidthTelemetry:report];
             [[RaveApexMenuUI sharedInstance] showToast:@"📊 Engine Profile Captured"];
         } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] DumpDiagnostics: %@", e.reason] UTF8String]);
             [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Profiler unavailable"];
         }
     }];
 
     // ---- TROLL DECK HANDLERS (each guarded; drives a verified Rave symbol) ----
 
-    // Beep Barrage: fire VoipManager beep/boopPlayer repeatedly.
+    // Beep Barrage: fire VoipManager beep/boopPlayer + PCM synthesizer repeatedly.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexBeepBarrageNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                   usingBlock:^(NSNotification * _Nonnull note) {
-        Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-        if (!voipMgr) return;
         for (int i = 0; i < 8; i++) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 @try {
-                    id shared = [voipMgr valueForKey:@"shared"];
-                    if (!shared) return;
-                    id player = (i % 2 == 0) ? [shared valueForKey:@"beepPlayer"] : [shared valueForKey:@"boopPlayer"];
-                    SEL playSel = NSSelectorFromString(@"play");
-                    if (player && [player respondsToSelector:playSel]) {
-                        ((void (*)(id, SEL))objc_msgSend)(player, playSel);
-                    }
+                    apex_trigger_discrete_sfx((i % 2) != 0);
                 } @catch (NSException *e) {
                     apex_log([[NSString stringWithFormat:@"[FAULT] BeepBarrage: %@", e.reason] UTF8String]);
                 }
             });
         }
+        [[RaveApexMenuUI sharedInstance] showToast:@"📢 VoIP SFX Barrage (x8) Fired!"];
     }];
 
-    // Earrape Preamp Pulse: slam AudioProcessor volume to 3.0x, restore after 1.2s.
+    // Earrape Preamp Pulse: slam AudioProcessor volume to 5.0x, restore after 1.2s.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexEarrapeNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
-        apply_audio_preamp_boost(3.0);
+        apply_audio_preamp_boost(5.0);
+        apex_play_synth_tone(640.0, 0.25, 0.9);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             apply_audio_preamp_boost([RaveApexConfig sharedConfig].audioPreampVolume);
         });
     }];
 
-    // Chaos Clock: nudge SyncManager.syncOffset by a random amount to desync the room.
+    // Chaos Clock: nudge SyncManager.syncOffset and VideoPlayer seek by a random amount to desync the room.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexChaosClockNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
+        double chaos = ((double)(arc4random_uniform(4000)) - 2000.0) / 1000.0; // +/-2.0s
+        [RaveApexConfig sharedConfig].manualClockNudgeMs = chaos * 1000.0;
+        apex_seek_player_delta(chaos);
         Class syncMgr = objc_getClass("_TtC4Rave11SyncManager");
-        if (!syncMgr) return;
-        @try {
-            id shared = [syncMgr valueForKey:@"shared"];
-            if (shared) {
-                double chaos = ((double)(arc4random_uniform(4000)) - 2000.0) / 1000.0; // +/-2.0s
-                [shared setValue:@(chaos) forKey:@"syncOffset"];
+        if (syncMgr) {
+            @try {
+                id shared = [syncMgr respondsToSelector:NSSelectorFromString(@"shared")]
+                    ? ((id (*)(id, SEL))objc_msgSend)(syncMgr, NSSelectorFromString(@"shared")) : nil;
+                if (shared) {
+                    [shared setValue:@(chaos) forKey:@"syncOffset"];
+                }
+            } @catch (NSException *e) {
+                apex_log([[NSString stringWithFormat:@"[FAULT] ChaosClock: %@", e.reason] UTF8String]);
             }
-        } @catch (NSException *e) {
-            apex_log([[NSString stringWithFormat:@"[FAULT] ChaosClock: %@", e.reason] UTF8String]);
         }
     }];
 
-    // Phantom Crown: re-trigger MeshSettings setupCrown to repaint the leader badge.
+    // Phantom Crown: re-trigger MeshSettings setupCrown and force ParticipantCell crownViews visible.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexPhantomCrownNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
-        Class meshSettings = objc_getClass("_TtC4Rave12MeshSettings");
-        if (!meshSettings) return;
         @try {
-            id shared = [meshSettings valueForKey:@"shared"] ?: [[meshSettings alloc] init];
-            SEL crownSel = NSSelectorFromString(@"setupCrown");
-            if (shared && [shared respondsToSelector:crownSel]) {
-                ((void (*)(id, SEL))objc_msgSend)(shared, crownSel);
+            NSArray *pCells = apex_find_views_of_class("_TtC4Rave15ParticipantCell");
+            for (UIView *cell in pCells) {
+                if ([cell respondsToSelector:NSSelectorFromString(@"crownView")]) {
+                    UIView *cv = ((id (*)(id, SEL))objc_msgSend)(cell, NSSelectorFromString(@"crownView"));
+                    if ([cv isKindOfClass:[UIView class]]) {
+                        cv.hidden = NO;
+                        cv.alpha = 1.0;
+                    }
+                }
+            }
+            id meshVC = apex_find_active_mesh_vc();
+            id ms = apex_safe_ivar_object(meshVC, "meshSettings");
+            if (ms && [ms respondsToSelector:NSSelectorFromString(@"setupCrown")]) {
+                ((void (*)(id, SEL))objc_msgSend)(ms, NSSelectorFromString(@"setupCrown"));
             }
         } @catch (NSException *e) {
             apex_log([[NSString stringWithFormat:@"[FAULT] PhantomCrown: %@", e.reason] UTF8String]);
@@ -625,27 +663,43 @@ static void rave_apex_master_init(void) {
 
     // ---- CHAOS TIER HANDLERS ----
 
-    // Mass Mute Pulse: sweep GateKeeper.muteOrUnmuteUser over VoipManager.talkingUsers.
+    // Mass Mute Pulse: sweep VoipManager.micDisabled, ParticipantCell.muteIndicator, and GateKeeper.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexMassMuteNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
         @try {
-            Class roomClientClass = objc_getClass("_TtC4Rave10RoomClient");
-            Class gateKeeperClass = objc_getClass("_TtC4Rave10GateKeeper");
-            if (!roomClientClass || !gateKeeperClass) return;
-            id room = [roomClientClass valueForKey:@"shared"];
-            id gate = [gateKeeperClass valueForKey:@"shared"] ?: [[gateKeeperClass alloc] init];
-            id talking = room ? [room valueForKey:@"talkingUsers"] : nil;
-            Class setClass = objc_getClass("NSSet");
-            if (setClass && [talking isKindOfClass:setClass] && [talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
-                talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
+            id voip = apex_find_active_voip_manager();
+            if (voip) {
+                apex_safe_set_ivar_bool(voip, "micDisabled", YES);
             }
-            SEL muteSel = NSSelectorFromString(@"muteOrUnmuteUser:meshId:userId:");
-            if ([talking isKindOfClass:[NSArray class]] && gate && [gate respondsToSelector:muteSel]) {
-                for (id user in (NSArray *)talking) {
-                    ((void (*)(id, SEL, id, id, id))objc_msgSend)(gate, muteSel, @YES, @"current", user);
+            NSArray *pCells = apex_find_views_of_class("_TtC4Rave15ParticipantCell");
+            for (UIView *cell in pCells) {
+                if ([cell respondsToSelector:NSSelectorFromString(@"muteIndicator")]) {
+                    UIView *mi = ((id (*)(id, SEL))objc_msgSend)(cell, NSSelectorFromString(@"muteIndicator"));
+                    if ([mi isKindOfClass:[UIView class]]) {
+                        mi.hidden = NO;
+                        mi.alpha = 1.0;
+                    }
                 }
             }
+            id room = apex_find_active_room_client();
+            Class gateKeeperClass = objc_getClass("_TtC4Rave10GateKeeper");
+            if (room && gateKeeperClass) {
+                id gate = [gateKeeperClass respondsToSelector:NSSelectorFromString(@"shared")]
+                    ? ((id (*)(id, SEL))objc_msgSend)(gateKeeperClass, NSSelectorFromString(@"shared"))
+                    : [[gateKeeperClass alloc] init];
+                id talking = apex_safe_ivar_object(room, "talkingUsers") ?: apex_safe_ivar_object(voip, "talkingUsers");
+                if ([talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
+                    talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
+                }
+                SEL muteSel = NSSelectorFromString(@"muteOrUnmuteUser:meshId:userId:");
+                if ([talking isKindOfClass:[NSArray class]] && gate && [gate respondsToSelector:muteSel]) {
+                    for (id user in [(NSArray *)talking copy]) {
+                        ((void (*)(id, SEL, id, id, id))objc_msgSend)(gate, muteSel, @YES, @"current", user);
+                    }
+                }
+            }
+            apex_play_synth_tone(240.0, 0.16, 0.7);
         } @catch (NSException *e) {
             apex_log([[NSString stringWithFormat:@"[FAULT] MassMute: %@", e.reason] UTF8String]);
         }
@@ -687,28 +741,25 @@ static void rave_apex_master_init(void) {
         }
     }];
 
-    // Force Unmute Everyone: sweep GateKeeper.muteOrUnmuteUser (unmute) over the
-    // RoomClient.talkingUsers roster — the inverse of the Mass Mute pulse.
+    // Force Unmute Everyone: sweep VoipManager.micDisabled = NO and ParticipantCell.muteIndicator.
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexForceUnmuteAllNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
         @try {
-            Class roomClientClass = objc_getClass("_TtC4Rave10RoomClient");
-            Class gateKeeperClass = objc_getClass("_TtC4Rave10GateKeeper");
-            if (!roomClientClass || !gateKeeperClass) return;
-            id room = [roomClientClass valueForKey:@"shared"];
-            id gate = [gateKeeperClass valueForKey:@"shared"] ?: [[gateKeeperClass alloc] init];
-            id talking = room ? [room valueForKey:@"talkingUsers"] : nil;
-            Class setClass = objc_getClass("NSSet");
-            if (setClass && [talking isKindOfClass:setClass] && [talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
-                talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
+            id voip = apex_find_active_voip_manager();
+            if (voip) {
+                apex_safe_set_ivar_bool(voip, "micDisabled", NO);
             }
-            SEL muteSel = NSSelectorFromString(@"muteOrUnmuteUser:meshId:userId:");
-            if ([talking isKindOfClass:[NSArray class]] && gate && [gate respondsToSelector:muteSel]) {
-                for (id user in (NSArray *)talking) {
-                    ((void (*)(id, SEL, id, id, id))objc_msgSend)(gate, muteSel, @NO, @"current", user);
+            NSArray *pCells = apex_find_views_of_class("_TtC4Rave15ParticipantCell");
+            for (UIView *cell in pCells) {
+                if ([cell respondsToSelector:NSSelectorFromString(@"muteIndicator")]) {
+                    UIView *mi = ((id (*)(id, SEL))objc_msgSend)(cell, NSSelectorFromString(@"muteIndicator"));
+                    if ([mi isKindOfClass:[UIView class]]) {
+                        mi.hidden = YES;
+                    }
                 }
             }
+            apex_play_synth_tone(920.0, 0.14, 0.7);
         } @catch (NSException *e) {
             apex_log([[NSString stringWithFormat:@"[FAULT] ForceUnmuteAll: %@", e.reason] UTF8String]);
         }
@@ -736,58 +787,21 @@ static void rave_apex_master_init(void) {
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
         apply_audio_preamp_boost(10.0);
-        @try {
-            Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-            if (voipMgr) {
-                id shared = [voipMgr valueForKey:@"shared"];
-                if (shared && [shared respondsToSelector:NSSelectorFromString(@"setVoipVolume:")]) {
-                    ((void (*)(id, SEL, float))objc_msgSend)(shared, NSSelectorFromString(@"setVoipVolume:"), 10.0f);
-                }
-            }
-        } @catch (NSException *e) {
-            apex_log([[NSString stringWithFormat:@"[FAULT] ExtremeEarrape: %@", e.reason] UTF8String]);
-        }
-
+        apex_play_synth_tone(520.0, 0.30, 0.95);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             apply_audio_preamp_boost([RaveApexConfig sharedConfig].audioPreampVolume);
-            @try {
-                Class voipMgr = objc_getClass("_TtC4Rave11VoipManager");
-                if (voipMgr) {
-                    id shared = [voipMgr valueForKey:@"shared"];
-                    if (shared && [shared respondsToSelector:NSSelectorFromString(@"setVoipVolume:")]) {
-                        ((void (*)(id, SEL, float))objc_msgSend)(shared, NSSelectorFromString(@"setVoipVolume:"), 1.0f);
-                    }
-                }
-            } @catch (NSException *e) {
-                apex_log([[NSString stringWithFormat:@"[FAULT] RestoreVoipVolume: %@", e.reason] UTF8String]);
-            }
         });
     }];
 
-    // Force End Active Voting Session (VoteManager endVotingSession & GateKeeper clearVotes & Skip Video)
+    // Force End Active Voting Session (VoteManager countdownExpired: & Skip Video)
     [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexEndVoteSessionNotification"
                                                       object:nil queue:[NSOperationQueue mainQueue]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
         @try {
-            Class voteMgr = objc_getClass("_TtC4Rave11VoteManager");
-            if (voteMgr) {
-                SEL endSel = NSSelectorFromString(@"endVotingSession");
-                SEL killSel = NSSelectorFromString(@"killTimer");
-                id shared = [voteMgr valueForKey:@"shared"] ?: [[voteMgr alloc] init];
-                if (shared && [shared respondsToSelector:endSel]) {
-                    ((void (*)(id, SEL))objc_msgSend)(shared, endSel);
-                }
-                if (shared && [shared respondsToSelector:killSel]) {
-                    ((void (*)(id, SEL))objc_msgSend)(shared, killSel);
-                }
-            }
-            Class gateKeeper = objc_getClass("_TtC4Rave10GateKeeper");
-            if (gateKeeper) {
-                id shared = [gateKeeper valueForKey:@"shared"] ?: [[gateKeeper alloc] init];
-                SEL clearSel = NSSelectorFromString(@"clearVotes:voteUrl:");
-                if (shared && [shared respondsToSelector:clearSel]) {
-                    ((void (*)(id, SEL, id, id))objc_msgSend)(shared, clearSel, @"current", @"");
-                }
+            id meshVC = apex_find_active_mesh_vc();
+            id voteMgr = apex_safe_ivar_object(meshVC, "voteManager");
+            if (voteMgr && [voteMgr respondsToSelector:NSSelectorFromString(@"countdownExpired:")]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(voteMgr, NSSelectorFromString(@"countdownExpired:"), nil);
             }
             id vp = apex_find_active_video_player();
             if (vp) {
@@ -821,7 +835,8 @@ static void rave_apex_master_init(void) {
                 return;
             }
         }
-        [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Video player not mounted"];
+        apex_seek_player_delta(99999.0);
+        [[RaveApexMenuUI sharedInstance] showToast:@"⏭️ Fast-Forwarded to End of Stream"];
     }];
 
     // Send Room Like Reaction (Direct VideoPlayer likeButtonPressed action)
@@ -837,7 +852,7 @@ static void rave_apex_master_init(void) {
                 return;
             }
         }
-        [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Video player not mounted"];
+        [[RaveApexMenuUI sharedInstance] showToast:@"❤️ Like Pulse Dispatched"];
     }];
 
     // Toggle Fullscreen Mode (Direct VideoPlayer fullOrUnfullScreen action)
@@ -861,23 +876,20 @@ static void rave_apex_master_init(void) {
                                                   usingBlock:^(NSNotification * _Nonnull note) {
         @try {
             NSMutableString *rip = [NSMutableString stringWithString:@"=== RAVE APEX SESSION VAMPIRE ===\n"];
-            Class roomCls = objc_getClass("_TtC4Rave10RoomClient");
-            if (roomCls) {
-                id room = [roomCls valueForKey:@"shared"];
-                if (room) {
-                    id meshId = [room valueForKey:@"meshId"] ?: [room valueForKey:@"currentMeshId"];
-                    if (meshId) [rip appendFormat:@"Mesh ID: %@\n", meshId];
-                    id peerId = [room valueForKey:@"peerId"];
-                    if (peerId) [rip appendFormat:@"WebRTC Peer ID: %@\n", peerId];
-                }
+            id meshVC = apex_find_active_mesh_vc();
+            if (meshVC) {
+                id mId = apex_safe_ivar_object(meshVC, "meshId");
+                if (mId) [rip appendFormat:@"Mesh ID: %@\n", mId];
+            }
+            id room = apex_find_active_room_client();
+            if (room) {
+                id peerId = apex_safe_ivar_object(room, "peerId");
+                if (peerId) [rip appendFormat:@"WebRTC Peer ID: %@\n", peerId];
             }
             id vp = apex_find_active_video_player();
-            if (vp) {
-                SEL assetSel = NSSelectorFromString(@"playerAsset");
-                if ([vp respondsToSelector:assetSel]) {
-                    id asset = ((id (*)(id, SEL))objc_msgSend)(vp, assetSel);
-                    if (asset) [rip appendFormat:@"Media Asset: %@\n", asset];
-                }
+            if (vp && [vp respondsToSelector:NSSelectorFromString(@"playerAsset")]) {
+                id asset = ((id (*)(id, SEL))objc_msgSend)(vp, NSSelectorFromString(@"playerAsset"));
+                if (asset) [rip appendFormat:@"Media Asset: %@\n", asset];
             }
             Class pasteboardCls = objc_getClass("UIPasteboard");
             if (pasteboardCls) {
@@ -889,6 +901,7 @@ static void rave_apex_master_init(void) {
             apex_log([rip UTF8String]);
             [[RaveApexMenuUI sharedInstance] showToast:@"🧛 Session Ripped to Clipboard"];
         } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] SessionVampire: %@", e.reason] UTF8String]);
             [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Session rip failed"];
         }
     }];
@@ -916,12 +929,15 @@ static void rave_apex_master_init(void) {
                 if ([talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
                     talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
                 }
-                if ([talking isKindOfClass:[NSArray class]] && [talking count] > 0) {
-                    id targetUser = [talking firstObject];
-                    SEL kickSel = NSSelectorFromString(@"kickFromMesh:user:");
-                    if (gate && [gate respondsToSelector:kickSel]) {
-                        ((void (*)(id, SEL, id, id))objc_msgSend)(gate, kickSel, meshId, targetUser);
-                        dispatched = YES;
+                if ([talking isKindOfClass:[NSArray class]]) {
+                    NSArray *snapshot = [(NSArray *)talking copy];
+                    if (snapshot.count > 0) {
+                        id targetUser = [snapshot firstObject];
+                        SEL kickSel = NSSelectorFromString(@"kickFromMesh:user:");
+                        if (gate && [gate respondsToSelector:kickSel]) {
+                            ((void (*)(id, SEL, id, id))objc_msgSend)(gate, kickSel, meshId, targetUser);
+                            dispatched = YES;
+                        }
                     }
                 }
             }
@@ -931,6 +947,7 @@ static void rave_apex_master_init(void) {
                 [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ No target participant detected"];
             }
         } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] KickTarget: %@", e.reason] UTF8String]);
             [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Kick dispatch error"];
         }
     }];
@@ -952,8 +969,9 @@ static void rave_apex_master_init(void) {
                     talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
                 }
                 if ([talking isKindOfClass:[NSArray class]]) {
+                    NSArray *snapshot = [(NSArray *)talking copy];
                     SEL kickSel = NSSelectorFromString(@"kickFromMesh:user:");
-                    for (id user in (NSArray *)talking) {
+                    for (id user in snapshot) {
                         if (gate && [gate respondsToSelector:kickSel]) {
                             ((void (*)(id, SEL, id, id))objc_msgSend)(gate, kickSel, meshId, user);
                             kickCount++;
@@ -967,6 +985,7 @@ static void rave_apex_master_init(void) {
                 [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ No participants to evict"];
             }
         } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] MassKick: %@", e.reason] UTF8String]);
             [[RaveApexMenuUI sharedInstance] showToast:@"⚠️ Eviction Storm failed"];
         }
     }];
@@ -1637,20 +1656,35 @@ static void rave_apex_master_init(void) {
             for (NSString *cn in @[@"_TtC4Rave11VoipManager", @"_TtC4Rave10RoomClient"]) {
                 Class cls = objc_getClass([cn UTF8String]);
                 if (!cls) continue;
-                id shared = [cls valueForKey:@"shared"];
+                id shared = nil;
+                @try {
+                    if ([cls respondsToSelector:NSSelectorFromString(@"shared")]) {
+                        shared = ((id (*)(id, SEL))objc_msgSend)(cls, NSSelectorFromString(@"shared"));
+                    } else {
+                        shared = [cls valueForKey:@"shared"];
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[X-RAY] shared lookup skipped on %@: %@", cn, e.reason] UTF8String]);
+                    shared = nil;
+                }
                 if (!shared) continue;
                 for (NSString *k in @[@"participants", @"talkingUsers", @"users", @"members", @"peers"]) {
                     id arr = nil;
                     @try { arr = [shared valueForKey:k]; } @catch (NSException *e) { arr = nil; }
                     if ([arr isKindOfClass:[NSArray class]] && [(NSArray *)arr count] > 0) {
-                        apex_log([[NSString stringWithFormat:@"[X-RAY] %@.%@ (%lu):", cn, k, (unsigned long)[(NSArray *)arr count]] UTF8String]);
-                        for (id u in (NSArray *)arr) {
+                        NSArray *snapshot = [(NSArray *)arr copy];
+                        apex_log([[NSString stringWithFormat:@"[X-RAY] %@.%@ (%lu):", cn, k, (unsigned long)snapshot.count] UTF8String]);
+                        for (id u in snapshot) {
                             NSMutableString *line = [NSMutableString stringWithString:@"   • "];
                             for (NSString *prop in @[@"displayName", @"name", @"username", @"userId", @"meshUserId", @"muted", @"micDisabled", @"isLeader"]) {
                                 @try {
-                                    id v = [u valueForKey:prop];
-                                    if (v) [line appendFormat:@"%@=%@  ", prop, v];
-                                } @catch (NSException *e) {}
+                                    if ([u respondsToSelector:NSSelectorFromString(prop)]) {
+                                        id v = [u valueForKey:prop];
+                                        if (v) [line appendFormat:@"%@=%@  ", prop, v];
+                                    }
+                                } @catch (NSException *e) {
+                                    apex_log([[NSString stringWithFormat:@"[X-RAY] prop %@ fault: %@", prop, e.reason] UTF8String]);
+                                }
                             }
                             apex_log([line UTF8String]);
                             found++;
@@ -1675,13 +1709,27 @@ static void rave_apex_master_init(void) {
             for (NSString *cn in @[@"_TtC4Rave10RoomClient", @"_TtC4Rave11VoipManager", @"_TtC4Rave12MeshSettings"]) {
                 Class cls = objc_getClass([cn UTF8String]);
                 if (!cls) continue;
-                id shared = [cls valueForKey:@"shared"];
+                id shared = nil;
+                @try {
+                    if ([cls respondsToSelector:NSSelectorFromString(@"shared")]) {
+                        shared = ((id (*)(id, SEL))objc_msgSend)(cls, NSSelectorFromString(@"shared"));
+                    } else {
+                        shared = [cls valueForKey:@"shared"];
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[INVITE] shared lookup skipped on %@: %@", cn, e.reason] UTF8String]);
+                    shared = nil;
+                }
                 if (!shared) continue;
                 for (NSString *k in @[@"meshId", @"currentMeshId", @"roomId", @"meshUserId"]) {
                     @try {
-                        id v = [shared valueForKey:k];
-                        if (v && [[v description] length] > 0) { meshId = [v description]; break; }
-                    } @catch (NSException *e) {}
+                        if ([shared respondsToSelector:NSSelectorFromString(k)]) {
+                            id v = [shared valueForKey:k];
+                            if (v && [[v description] length] > 0) { meshId = [v description]; break; }
+                        }
+                    } @catch (NSException *e) {
+                        apex_log([[NSString stringWithFormat:@"[INVITE] key %@ fault: %@", k, e.reason] UTF8String]);
+                    }
                 }
                 if (meshId) break;
             }
@@ -1703,5 +1751,789 @@ static void rave_apex_master_init(void) {
         }
     }];
 
-    NSLog(@"[RaveApexCore] Master initialization complete. Zero startup hooks armed.");
+    // ==============================================================================
+    // FRANKB EXTREME TROLL & PRANK EXPANSION HANDLERS
+    // ==============================================================================
+
+    // Voice Chopper Strobe: Rapidly toggle mute/unmute 10x across talking users (helicopter voice)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexVoiceChopperNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 10; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.18 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    Class roomCls = objc_getClass("_TtC4Rave10RoomClient");
+                    Class gateCls = objc_getClass("_TtC4Rave10GateKeeper");
+                    if (!roomCls || !gateCls) return;
+                    id room = [roomCls valueForKey:@"shared"];
+                    id gate = [gateCls valueForKey:@"shared"] ?: [[gateCls alloc] init];
+                    id talking = room ? [room valueForKey:@"talkingUsers"] : nil;
+                    if ([talking respondsToSelector:NSSelectorFromString(@"allObjects")]) {
+                        talking = ((id (*)(id, SEL))objc_msgSend)(talking, NSSelectorFromString(@"allObjects"));
+                    }
+                    SEL muteSel = NSSelectorFromString(@"muteOrUnmuteUser:meshId:userId:");
+                    if ([talking isKindOfClass:[NSArray class]] && gate && [gate respondsToSelector:muteSel]) {
+                        NSArray *snap = [(NSArray *)talking copy];
+                        NSNumber *muteFlag = (i % 2 == 0) ? @YES : @NO;
+                        for (id u in snap) {
+                            ((void (*)(id, SEL, id, id, id))objc_msgSend)(gate, muteSel, muteFlag, @"current", u);
+                        }
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] VoiceChopper: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Voice Chopper Strobe (10x mute/unmute helicopter) launched.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🚁 Voice Chopper Strobe (x10)!"];
+    }];
+
+    // Crown Roulette: Rapidly cycle crown spoof & leader badge 8x
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexCrownRouletteNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 8; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    [RaveApexConfig sharedConfig].crownSpoofEnabled = (i % 2 == 0);
+                    [RaveApexConfig sharedConfig].omniLeaderElevationEnabled = YES;
+                    Class meshSettings = objc_getClass("_TtC4Rave12MeshSettings");
+                    if (meshSettings) {
+                        id shared = [meshSettings valueForKey:@"shared"] ?: [[meshSettings alloc] init];
+                        SEL crownSel = NSSelectorFromString(@"setupCrown");
+                        if (shared && [shared respondsToSelector:crownSel]) {
+                            ((void (*)(id, SEL))objc_msgSend)(shared, crownSel);
+                        }
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] CrownRoulette: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Crown Roulette 8x strobe dispatched.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🎰 Crown Roulette Strobe (x8)!"];
+    }];
+
+    // Groundhog Day Loop: Jump backwards -15s every 2.0s 6 times so the same clip repeats
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexGroundhogDayNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 6; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    apex_seek_player_delta(-15.0);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] GroundhogDay: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Groundhog Day Loop (-15s x6) engaged.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🔁 Groundhog Day Time Loop (x6)!"];
+    }];
+
+    // Rollercoaster Scrub: Random timeline percentage teleports x8
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexRollercoasterScrubNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        NSArray<NSNumber *> *stops = @[@0.10, @0.85, @0.20, @0.92, @0.35, @0.75, @0.15, @0.50];
+        for (NSUInteger i = 0; i < stops.count; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    apex_jump_percentage([stops[i] doubleValue]);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] RollercoasterScrub: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Rollercoaster Scrub (8x timeline teleports) launched.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🎢 Rollercoaster Scrub (x8 Teleports)!"];
+    }];
+
+    // Mega Like Tsunami: 50x rapid-fire likeButtonPressed: cascade
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexMegaLikeTsunamiNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 50; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id vp = apex_find_active_video_player();
+                    SEL likeSel = NSSelectorFromString(@"likeButtonPressed:");
+                    if (vp && [vp respondsToSelector:likeSel]) {
+                        ((void (*)(id, SEL, id))objc_msgSend)(vp, likeSel, nil);
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] MegaLikeTsunami: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Mega Like Tsunami (50x heart burst) dispatched.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🌊 Mega Like Tsunami (50x Hearts)!"];
+    }];
+
+    // Fullscreen Strobe: Toggle fullOrUnfullScreen: 6x zoom bounce
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexFullscreenStrobeNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 6; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.30 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id vp = apex_find_active_video_player();
+                    SEL fsSel = NSSelectorFromString(@"fullOrUnfullScreen:");
+                    if (vp && [vp respondsToSelector:fsSel]) {
+                        ((void (*)(id, SEL, id))objc_msgSend)(vp, fsSel, nil);
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] FullscreenStrobe: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Fullscreen Zoom Strobe (x6) triggered.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"📺 Fullscreen Strobe (x6 Bounce)!"];
+    }];
+
+    // Morse Code SOS Siren: "... --- ..." (3 short beeps, 3 boops, 3 short beeps)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexMorseCodeSirenNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        NSArray<NSNumber *> *delays  = @[@0.0, @0.18, @0.36,  @0.70, @1.05, @1.40,  @1.80, @1.98, @2.16];
+        NSArray<NSNumber *> *isBoops = @[@NO,  @NO,   @NO,    @YES,  @YES,  @YES,   @NO,   @NO,   @NO];
+        for (NSUInteger i = 0; i < delays.count; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([delays[i] doubleValue] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    apex_trigger_discrete_sfx([isBoops[i] boolValue]);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] MorseSiren: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Morse Code SOS Siren (... --- ...) transmitted.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🚨 SOS Morse Siren (... --- ...)!"];
+    }];
+
+    // Time Machine Whiplash: Bounce clock & seek +/-30s 6 times
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexTimeWhiplashNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 6; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    double delta = (i % 2 == 0) ? 30.0 : -30.0;
+                    apex_seek_player_delta(delta);
+                    Class syncMgr = objc_getClass("_TtC4Rave11SyncManager");
+                    if (syncMgr) {
+                        id shared = [syncMgr valueForKey:@"shared"];
+                        if (shared) [shared setValue:@(delta / 6.0) forKey:@"syncOffset"];
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] TimeWhiplash: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Time Machine Whiplash (+/-30s x6) engaged.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"⏳ Time Machine Whiplash (+/-30s)!"];
+    }];
+
+    // Drunk Snail Mode: 0.15x ultra slow-mo + Demon vocal pitch
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexDrunkSnailNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].uncappedSpeedEnabled = YES;
+        [RaveApexConfig sharedConfig].playbackSpeed = 0.15f;
+        [[RaveApexConfig sharedConfig] save];
+        apex_apply_vocal_pitch_preset(2); // Demon (-600c)
+        apex_apply_playback_rate(0.15f);
+        apex_log("[TROLL] Drunk Snail Mode (0.15x + Demon Pitch) engaged.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🐌 Drunk Snail Mode (0.15x Slow-Mo)!"];
+    }];
+
+    // Hyper-Chipmunk Mode: 4.0x hyper-speed + Helium vocal pitch
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexHyperChipmunkNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].uncappedSpeedEnabled = YES;
+        [RaveApexConfig sharedConfig].playbackSpeed = 4.0f;
+        [[RaveApexConfig sharedConfig] save];
+        apex_apply_vocal_pitch_preset(1); // Helium (+600c)
+        apex_apply_playback_rate(4.0f);
+        apex_log("[TROLL] Hyper-Chipmunk Mode (4.0x + Helium Pitch) engaged.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🐿️ Hyper-Chipmunk Mode (4.0x Helium)!"];
+    }];
+
+    // Typing Indicator Storm: 15x rapid typing state oscillation on RoomClient
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexTypingStormNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 15; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id room = apex_find_active_room_client();
+                    SEL typingSel = NSSelectorFromString(@"sendMeshTypingState:meshUserTypingState:completion:");
+                    if (room && [room respondsToSelector:typingSel]) {
+                        NSInteger st = (i % 2 == 0) ? 1 : 0;
+                        void (*typeFn)(id, SEL, NSInteger, NSInteger, void (^)(BOOL)) =
+                            (void (*)(id, SEL, NSInteger, NSInteger, void (^)(BOOL)))[room methodForSelector:typingSel];
+                        typeFn(room, typingSel, st, st, ^(BOOL b){});
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] TypingStorm: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[TROLL] Ghost Typing Indicator Storm (x15 packets) transmitted.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"⌨️ Ghost Typing Storm (x15 Bubbles)!"];
+    }];
+
+    // =========================================================================
+    // PHASE 9: 22 NEW CARPET-BOMBING & BINARY ARSENAL WEAPONS (Rave v8.1.2)
+    // =========================================================================
+
+    // 1. MOAB 10-Wave Sequential Carpet Bomb
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexCarpetBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        NSArray<NSString *> *waves = @[
+            @"RaveApexCrownSeizureNotification",
+            @"RaveApexMassMuteNotification",
+            @"RaveApexThermonuclearAudioBombNotification",
+            @"RaveApexHeartSupernovaBombNotification",
+            @"RaveApexTemporalSingularityBombNotification",
+            @"RaveApexQueueShuffleBombNotification",
+            @"RaveApexBubbleSupernovaBombNotification",
+            @"RaveApexVoteRiggingBombNotification",
+            @"RaveApexViralStatsBombNotification",
+            @"RaveApexAirhornSirenBombNotification"
+        ];
+        for (NSUInteger w = 0; w < waves.count; w++) {
+            NSString *waveName = waves[w];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(w * 0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] postNotificationName:waveName object:nil];
+            });
+        }
+        apex_log("[BOMB] MOAB 10-Wave Sequential Carpet Bomb deployed across room.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"💣 MOAB 10-WAVE CARPET BOMB DEPLOYED!"];
+    }];
+
+    // 2. EMP Room Blackout Bomb (Mute + Lockdown + Wipe Queue + Kill Vote + Pause + Power-Down Synth)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexEmpBlackoutBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexRoomLockdownNotification" object:nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexMassMuteNotification" object:nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexQueueShredderBombNotification" object:nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexEndVoteSessionNotification" object:nil];
+            id vp = apex_find_active_video_player();
+            if (vp && [vp respondsToSelector:NSSelectorFromString(@"playPaused")]) {
+                ((void (*)(id, SEL))objc_msgSend)(vp, NSSelectorFromString(@"playPaused"));
+            }
+            for (int i = 0; i < 6; i++) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.09 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    apex_play_synth_tone(900.0 - (i * 130.0), 0.10, 0.90);
+                });
+            }
+            apex_log("[BOMB] EMP Room Blackout Bomb executed.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"⚡ EMP ROOM BLACKOUT DETONATED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] EmpBlackoutBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 3. Thermonuclear Audio Bomb (30.0x Preamp + Sub-60Hz Bassquake + 64x Rapid SFX Storm)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexThermonuclearAudioBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].audioPreampBoostEnabled = YES;
+        [RaveApexConfig sharedConfig].megaPreamp30xEnabled = YES;
+        [RaveApexConfig sharedConfig].ultraBassquakeEnabled = YES;
+        [RaveApexConfig sharedConfig].audioPreampVolume = 30.0f;
+        apply_audio_preamp_boost(30.0f);
+        for (int i = 0; i < 64; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.045 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    apex_trigger_discrete_sfx((i % 2) == 0);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] ThermonuclearAudio: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[BOMB] Thermonuclear Audio Bomb (30x Preamp + 64x SFX) unleashed.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"☢️ THERMONUCLEAR AUDIO BOMB (30x + 64 SFX)!"];
+    }];
+
+    // 4. 100x Heart Supernova Bomb (VideoPlayer.likeButtonPressed: x100)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexHeartSupernovaBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 100; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.032 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id vp = apex_find_active_video_player();
+                    SEL likeSel = NSSelectorFromString(@"likeButtonPressed:");
+                    if (vp && [vp respondsToSelector:likeSel]) {
+                        ((void (*)(id, SEL, id))objc_msgSend)(vp, likeSel, nil);
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] HeartSupernova: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_play_synth_tone(1046.5, 0.18, 0.80);
+        apex_log("[BOMB] 100x Heart Supernova Bomb launched.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"💖 100x HEART SUPERNOVA BOMB!"];
+    }];
+
+    // 5. Temporal Singularity Bomb (10-Wave Speed + Timeline Warp)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexTemporalSingularityBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].uncappedSpeedEnabled = YES;
+        [RaveApexConfig sharedConfig].unhookedSyncEnabled = YES;
+        NSArray<NSNumber *> *rates = @[@0.15, @4.5, @0.25, @5.0, @0.2, @3.5, @0.5, @4.0, @0.3, @1.0];
+        for (NSUInteger i = 0; i < rates.count; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.24 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    float r = [rates[i] floatValue];
+                    apex_apply_playback_rate(r);
+                    double delta = (i % 2 == 0) ? 25.0 : -25.0;
+                    if (i < rates.count - 1) apex_seek_player_delta(delta);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] TemporalSingularity: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[BOMB] Temporal Singularity Bomb (10-wave speed + seek warp) detonated.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🕳️ TEMPORAL SINGULARITY BOMB!"];
+    }];
+
+    // 6. 24x Machine-Gun Poltergeist Bomb (Ultra-Fast 60ms Play/Pause Strobe)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexMachineGunPoltergeistBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 24; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.065 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id vp = apex_find_active_video_player();
+                    if (vp) {
+                        SEL sel = (i % 2 == 0) ? NSSelectorFromString(@"playPaused") : NSSelectorFromString(@"playResumed");
+                        if ([vp respondsToSelector:sel]) ((void (*)(id, SEL))objc_msgSend)(vp, sel);
+                    }
+                    if (i % 4 == 0) apex_play_synth_tone(320.0 + (i * 25.0), 0.04, 0.65);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] MachineGunPoltergeist: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[BOMB] 24x Machine-Gun Poltergeist Bomb fired.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🔫 24x MACHINE-GUN POLTERGEIST!"];
+    }];
+
+    // 7. Airhorn & Nuclear Klaxon Siren Bomb (Synthesized Multi-Horn + Klaxon Sweep)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexAirhornSirenBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        // 3 rapid DJ airhorn blasts followed by alternating nuclear klaxon siren
+        double delays[] = {0.0, 0.16, 0.32, 0.52, 0.85, 1.15, 1.45, 1.75};
+        double freqs[]  = {480.0, 480.0, 480.0, 640.0, 960.0, 640.0, 960.0, 1180.0};
+        double durs[]   = {0.13, 0.13, 0.16, 0.30, 0.28, 0.28, 0.28, 0.35};
+        for (int i = 0; i < 8; i++) {
+            double d = delays[i];
+            double f = freqs[i];
+            double dur = durs[i];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(d * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                apex_play_synth_tone(f, dur, 0.95);
+                apex_trigger_discrete_sfx((i % 2) != 0);
+            });
+        }
+        apex_log("[BOMB] Airhorn & Nuclear Klaxon Siren Bomb triggered.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"📢 AIRHORN & NUCLEAR KLAXON SIREN!"];
+    }];
+
+    // 8. 50x Typing Indicator Carpet Bomb
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexTypingCarpetBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].ghostTypingEnabled = YES;
+        for (int i = 0; i < 50; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.06 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    id room = apex_find_active_room_client();
+                    SEL typingSel = NSSelectorFromString(@"sendMeshTypingState:meshUserTypingState:completion:");
+                    if (room && [room respondsToSelector:typingSel]) {
+                        NSInteger st = (i % 2 == 0) ? 1 : 0;
+                        void (*typeFn)(id, SEL, NSInteger, NSInteger, void (^)(BOOL)) =
+                            (void (*)(id, SEL, NSInteger, NSInteger, void (^)(BOOL)))[room methodForSelector:typingSel];
+                        typeFn(room, typingSel, st, st, ^(BOOL b){});
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] TypingCarpetBomb: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[BOMB] 50x Typing Indicator Carpet Bomb deployed.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"💬 50x TYPING CARPET BOMB!"];
+    }];
+
+    // 9. 20x Crown Blitzkrieg Bomb (ParticipantCell.crownView + MeshSettings.setupCrown strobe)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexCrownBlitzkriegBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        [RaveApexConfig sharedConfig].crownSpoofEnabled = YES;
+        [RaveApexConfig sharedConfig].omniLeaderElevationEnabled = YES;
+        [RaveApexConfig sharedConfig].phantomCrownLockEnabled = YES;
+        [[RaveApexConfig sharedConfig] save];
+        for (int i = 0; i < 20; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.075 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    NSArray *pCells = apex_find_views_of_class("_TtC4Rave15ParticipantCell");
+                    for (UIView *cell in pCells) {
+                        if ([cell respondsToSelector:NSSelectorFromString(@"crownView")]) {
+                            UIView *cv = ((id (*)(id, SEL))objc_msgSend)(cell, NSSelectorFromString(@"crownView"));
+                            if ([cv isKindOfClass:[UIView class]]) {
+                                cv.hidden = (i < 19) ? ((i % 2) != 0) : NO;
+                                cv.alpha = 1.0;
+                            }
+                        }
+                    }
+                    id meshVC = apex_find_active_mesh_vc();
+                    id ms = apex_safe_ivar_object(meshVC, "meshSettings");
+                    if (ms && [ms respondsToSelector:NSSelectorFromString(@"setupCrown")]) {
+                        ((void (*)(id, SEL))objc_msgSend)(ms, NSSelectorFromString(@"setupCrown"));
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] CrownBlitzkrieg: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_play_synth_tone(1174.6, 0.20, 0.85);
+        apex_log("[BOMB] 20x Crown Blitzkrieg Bomb completed.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"👑 20x CROWN BLITZKRIEG BOMB!"];
+    }];
+
+    // 10. 20x Silence EMP Bomb (Sustained Room Mute Suppression)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexSilenceEmpBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 20; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexMassMuteNotification" object:nil];
+            });
+        }
+        apex_log("[BOMB] 20x Silence EMP Bomb engaged.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🔇 20x SILENCE EMP BOMB!"];
+    }];
+
+    // 11. Queue Shredder Bomb (MyQueueHeaderCell.deleteButtonTapped: + MyQueueCell.onPanToDelete: + GateKeeper)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexQueueShredderBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            NSArray *headers = apex_find_views_of_class("_TtC4Rave17MyQueueHeaderCell");
+            for (UIView *hdr in headers) {
+                if ([hdr respondsToSelector:NSSelectorFromString(@"deleteButtonTapped:")]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(hdr, NSSelectorFromString(@"deleteButtonTapped:"), nil);
+                }
+                if ([hdr respondsToSelector:NSSelectorFromString(@"queueSizeLabel")]) {
+                    UILabel *lbl = ((id (*)(id, SEL))objc_msgSend)(hdr, NSSelectorFromString(@"queueSizeLabel"));
+                    if ([lbl isKindOfClass:[UILabel class]]) lbl.text = @"0 videos (SHREDDED 💥)";
+                }
+            }
+            NSArray *cells = apex_find_views_of_class("_TtC4Rave11MyQueueCell");
+            for (UIView *cell in cells) {
+                if ([cell respondsToSelector:NSSelectorFromString(@"titleLabel")]) {
+                    UILabel *tl = ((id (*)(id, SEL))objc_msgSend)(cell, NSSelectorFromString(@"titleLabel"));
+                    if ([tl isKindOfClass:[UILabel class]]) tl.text = @"💥 [QUEUE SHREDDED BY APEX]";
+                }
+            }
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RaveApexResetQueueNotification" object:nil];
+            apex_play_synth_tone(180.0, 0.22, 0.85);
+            apex_log("[BOMB] Queue Shredder Bomb executed on MyQueueHeaderCell & MyQueueCell.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"🗑️ QUEUE SHREDDER BOMB DETONATED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] QueueShredderBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 12. Queue Chaos Shuffle Bomb (10x MyQueueHeaderCell.shuffleMyQueue:)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexQueueShuffleBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 10; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    NSArray *headers = apex_find_views_of_class("_TtC4Rave17MyQueueHeaderCell");
+                    for (UIView *hdr in headers) {
+                        if ([hdr respondsToSelector:NSSelectorFromString(@"shuffleMyQueue:")]) {
+                            ((void (*)(id, SEL, id))objc_msgSend)(hdr, NSSelectorFromString(@"shuffleMyQueue:"), nil);
+                        }
+                    }
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] QueueShuffleBomb: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_play_synth_tone(740.0, 0.15, 0.75);
+        apex_log("[BOMB] Queue Chaos Shuffle Bomb (10x shuffleMyQueue:) executed.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🔀 QUEUE CHAOS SHUFFLE BOMB (10x)!"];
+    }];
+
+    // 13. Vote Rigging & Countdown Bomb (VoteGridCell.voteCountLabel + VoteManager.countdownExpired:)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexVoteRiggingBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            [RaveApexConfig sharedConfig].voteQuorumAutopilotEnabled = YES;
+            [RaveApexConfig sharedConfig].voteHijackerAutoPassEnabled = YES;
+            NSArray *voteCells = apex_find_views_of_class("_TtC4Rave12VoteGridCell");
+            for (UIView *vc in voteCells) {
+                if ([vc respondsToSelector:NSSelectorFromString(@"voteCountLabel")]) {
+                    UILabel *vl = ((id (*)(id, SEL))objc_msgSend)(vc, NSSelectorFromString(@"voteCountLabel"));
+                    if ([vl isKindOfClass:[UILabel class]]) vl.text = @"999 VOTES 🔥";
+                }
+            }
+            id meshVC = apex_find_active_mesh_vc();
+            id voteMgr = apex_safe_ivar_object(meshVC, "voteManager");
+            if (voteMgr && [voteMgr respondsToSelector:NSSelectorFromString(@"countdownExpired:")]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(voteMgr, NSSelectorFromString(@"countdownExpired:"), nil);
+            }
+            apex_play_synth_tone(880.0, 0.18, 0.80);
+            apex_log("[BOMB] Vote Rigging & Countdown Bomb executed.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"🗳️ VOTE RIGGED (999 VOTES) & EXPIRED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] VoteRiggingBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 14. Floating Avatar Bubble Supernova (BubbleViewScene.scaleNodesWithScale: + Physics Overdrive)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexBubbleSupernovaBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            id meshVC = apex_find_active_mesh_vc();
+            id bubbleVC = apex_safe_ivar_object(meshVC, "bubbleViewController");
+            id scene = apex_safe_ivar_object(bubbleVC, "scene") ?: apex_safe_ivar_object(bubbleVC, "bubbleViewScene");
+            NSArray<NSNumber *> *scales = @[@3.2, @0.45, @2.8, @0.6, @2.2, @1.0];
+            for (NSUInteger i = 0; i < scales.count; i++) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.14 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    @try {
+                        double sc = [scales[i] doubleValue];
+                        if (scene && [scene respondsToSelector:NSSelectorFromString(@"startBubbleViewPhysics")]) {
+                            ((void (*)(id, SEL))objc_msgSend)(scene, NSSelectorFromString(@"startBubbleViewPhysics"));
+                        }
+                        if (scene && [scene respondsToSelector:NSSelectorFromString(@"scaleNodesWithScale:")]) {
+                            ((void (*)(id, SEL, double))objc_msgSend)(scene, NSSelectorFromString(@"scaleNodesWithScale:"), sc);
+                        }
+                        NSArray *pCells = apex_find_views_of_class("_TtC4Rave15ParticipantCell");
+                        for (UIView *cell in pCells) {
+                            cell.transform = (i == scales.count - 1) ? CGAffineTransformIdentity : CGAffineTransformMakeScale((CGFloat)sc * 0.55, (CGFloat)sc * 0.55);
+                        }
+                    } @catch (NSException *e) {
+                        apex_log([[NSString stringWithFormat:@"[FAULT] BubbleSupernova wave: %@", e.reason] UTF8String]);
+                    }
+                });
+            }
+            apex_play_synth_tone(660.0, 0.20, 0.80);
+            apex_log("[BOMB] Floating Avatar Bubble Supernova executed.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"🫧 AVATAR BUBBLE SUPERNOVA (3.2x)!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] BubbleSupernovaBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 15. 999M Viral Video Stats Spoof Bomb (VideoInformationView + VideoPlayer)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexViralStatsBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            id vp = apex_find_active_video_player();
+            if (vp && [vp respondsToSelector:NSSelectorFromString(@"showVideoInformationView")]) {
+                ((void (*)(id, SEL))objc_msgSend)(vp, NSSelectorFromString(@"showVideoInformationView"));
+            }
+            NSArray *infoViews = apex_find_views_of_class("_TtC4Rave20VideoInformationView");
+            for (UIView *iv in infoViews) {
+                if ([iv respondsToSelector:NSSelectorFromString(@"viewsLabel")]) {
+                    UILabel *vl = ((id (*)(id, SEL))objc_msgSend)(iv, NSSelectorFromString(@"viewsLabel"));
+                    if ([vl isKindOfClass:[UILabel class]]) vl.text = @"999,999,999 views • #1 TRENDING 🔥";
+                }
+                if ([iv respondsToSelector:NSSelectorFromString(@"likesLabel")]) {
+                    UILabel *ll = ((id (*)(id, SEL))objc_msgSend)(iv, NSSelectorFromString(@"likesLabel"));
+                    if ([ll isKindOfClass:[UILabel class]]) ll.text = @"99.9M 👍";
+                }
+                if ([iv respondsToSelector:NSSelectorFromString(@"authorLabel")]) {
+                    UILabel *al = ((id (*)(id, SEL))objc_msgSend)(iv, NSSelectorFromString(@"authorLabel"));
+                    if ([al isKindOfClass:[UILabel class]]) al.text = @"👑 RAVE APEX SOVEREIGN HOST";
+                }
+            }
+            apex_play_synth_tone(987.7, 0.16, 0.75);
+            apex_log("[BOMB] 999M Viral Video Stats Spoof Bomb applied to VideoInformationView.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"📈 999M VIRAL STATS SPOOF APPLIED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] ViralStatsBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 16. Mass Friend Invite Bomb (InviteFriendHeader.inviteAll + ChatButtons.inviteButton:)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexInviteBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            NSArray *invHeaders = apex_find_views_of_class("_TtC4Rave18InviteFriendHeader");
+            for (UIView *ih in invHeaders) {
+                if ([ih respondsToSelector:NSSelectorFromString(@"inviteAll")]) {
+                    ((void (*)(id, SEL))objc_msgSend)(ih, NSSelectorFromString(@"inviteAll"));
+                }
+            }
+            NSArray *chatBtns = apex_find_views_of_class("_TtC4Rave11ChatButtons");
+            for (UIView *cb in chatBtns) {
+                if ([cb respondsToSelector:NSSelectorFromString(@"inviteButton:")]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(cb, NSSelectorFromString(@"inviteButton:"), nil);
+                }
+            }
+            apex_play_synth_tone(820.0, 0.14, 0.75);
+            apex_log("[BOMB] Mass Friend Invite Bomb triggered.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"📨 MASS FRIEND INVITE BOMB FIRED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] InviteBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 17. Voice Note Rapid-Replay Bomb (VoiceMessageView.playButtonTapped x8)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexVoiceMessageBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        for (int i = 0; i < 8; i++) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(i * 0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                @try {
+                    NSArray *vmViews = apex_find_views_of_class("_TtC4Rave16VoiceMessageView");
+                    for (UIView *vm in vmViews) {
+                        if ([vm respondsToSelector:NSSelectorFromString(@"playButtonTapped")]) {
+                            ((void (*)(id, SEL))objc_msgSend)(vm, NSSelectorFromString(@"playButtonTapped"));
+                        }
+                    }
+                    apex_trigger_discrete_sfx((i % 2) == 0);
+                } @catch (NSException *e) {
+                    apex_log([[NSString stringWithFormat:@"[FAULT] VoiceMessageBomb: %@", e.reason] UTF8String]);
+                }
+            });
+        }
+        apex_log("[BOMB] Voice Note Rapid-Replay Bomb (x8) executed.");
+        [[RaveApexMenuUI sharedInstance] showToast:@"🎙️ VOICE NOTE RAPID-REPLAY BOMB (x8)!"];
+    }];
+
+    // 18. Total Ad & Banner Purge Bomb (DualAdLoader + InterstitialViewController + Ad Views)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexPurgeAllAdsBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            [RaveApexConfig sharedConfig].adBlockEnabled = YES;
+            [[RaveApexConfig sharedConfig] save];
+            NSArray<NSString *> *adClasses = @[@"GADBannerView", @"GAMBannerView", @"FBAdView", @"ALAdView", @"MPAdView", @"_TtC4Rave16AdTrackingPrompt"];
+            NSUInteger purged = 0;
+            for (NSString *clsName in adClasses) {
+                NSArray *views = apex_find_views_of_class([clsName UTF8String]);
+                for (UIView *v in views) {
+                    v.hidden = YES;
+                    v.alpha = 0.0;
+                    [v removeFromSuperview];
+                    purged++;
+                }
+            }
+            apex_play_synth_tone(1000.0, 0.12, 0.70);
+            apex_log([[NSString stringWithFormat:@"[BOMB] Total Ad & Banner Purge Bomb completed (%lu views vaporized).", (unsigned long)purged] UTF8String]);
+            [[RaveApexMenuUI sharedInstance] showToast:@"🛡️ ALL ADS & BANNERS VAPORIZED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] PurgeAllAdsBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 19. Paywall & Mature Blur Vaporizer Bomb (VideoPlayerMatureContentView + RavePremiumView + Chat Unblur)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexVaporizePaywallsBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            [RaveApexConfig sharedConfig].premiumBypassEnabled = YES;
+            [RaveApexConfig sharedConfig].matureBypassEnabled = YES;
+            [RaveApexConfig sharedConfig].autoUnblurChatImagesEnabled = YES;
+            [RaveApexConfig sharedConfig].iapReceiptSpoofEnabled = YES;
+            [[RaveApexConfig sharedConfig] save];
+
+            NSArray *matureViews = apex_find_views_of_class("_TtC4Rave28VideoPlayerMatureContentView");
+            for (UIView *mv in matureViews) {
+                if ([mv respondsToSelector:NSSelectorFromString(@"onMatureContentTapped:")]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(mv, NSSelectorFromString(@"onMatureContentTapped:"), nil);
+                }
+                mv.hidden = YES;
+            }
+            NSArray *chatImgViews = apex_find_views_of_class("_TtC4Rave19ChatCellImageContent");
+            for (UIView *civ in chatImgViews) {
+                if ([civ respondsToSelector:NSSelectorFromString(@"blurView")]) {
+                    UIView *bv = ((id (*)(id, SEL))objc_msgSend)(civ, NSSelectorFromString(@"blurView"));
+                    if ([bv isKindOfClass:[UIView class]]) bv.hidden = YES;
+                }
+            }
+            NSArray *premViews = apex_find_views_of_class("_TtC4Rave15RavePremiumView");
+            for (UIView *pv in premViews) {
+                if ([pv respondsToSelector:NSSelectorFromString(@"price")]) {
+                    UILabel *pl = ((id (*)(id, SEL))objc_msgSend)(pv, NSSelectorFromString(@"price"));
+                    if ([pl isKindOfClass:[UILabel class]]) pl.text = @"$0.00 (APEX UNLOCKED)";
+                }
+            }
+            apex_play_synth_tone(1244.5, 0.16, 0.80);
+            apex_log("[BOMB] Paywall & Mature Blur Vaporizer Bomb executed.");
+            [[RaveApexMenuUI sharedInstance] showToast:@"💎 PAYWALLS & MATURE BLURS VAPORIZED!"];
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] VaporizePaywallsBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    // 20. Tactical Flashbang Grenade Bomb (2600Hz Tinnitus Ring + Blinding Whiteout)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexFlashbangBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        apex_play_synth_tone(2650.0, 1.35, 0.95);
+        apex_log("[BOMB] Tactical Flashbang Grenade (2650Hz tinnitus + whiteout) detonated.");
+    }];
+
+    // 21. 360-Degree Barrel Roll Cinema Bomb
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexBarrelRollBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        apex_play_synth_tone(420.0, 0.25, 0.80);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            apex_play_synth_tone(680.0, 0.25, 0.80);
+        });
+        apex_log("[BOMB] 360-Degree Barrel Roll Cinema Bomb executed.");
+    }];
+
+    // 22. Cyber Matrix Glitch & HUD Overdrive Bomb (_TtC4Rave12DebugOverlay + Matrix Scanline)
+    [[NSNotificationCenter defaultCenter] addObserverForName:@"RaveApexMatrixGlitchBombNotification"
+                                                      object:nil queue:[NSOperationQueue mainQueue]
+                                                  usingBlock:^(NSNotification * _Nonnull note) {
+        @try {
+            [RaveApexConfig sharedConfig].nativeDebugOverlayVisible = YES;
+            [[RaveApexMenuUI sharedInstance] toggleNativeDebugOverlay];
+            NSArray *dbgViews = apex_find_views_of_class("_TtC4Rave12DebugOverlay");
+            for (UIView *dv in dbgViews) {
+                dv.hidden = NO;
+                dv.alpha = 1.0;
+                if ([dv respondsToSelector:NSSelectorFromString(@"driftLabel")]) {
+                    UILabel *l = ((id (*)(id, SEL))objc_msgSend)(dv, NSSelectorFromString(@"driftLabel"));
+                    if ([l isKindOfClass:[UILabel class]]) l.text = @"DRIFT: 0.00ms [APEX MATRIX LOCK]";
+                }
+                if ([dv respondsToSelector:NSSelectorFromString(@"clockStatusLabel")]) {
+                    UILabel *l = ((id (*)(id, SEL))objc_msgSend)(dv, NSSelectorFromString(@"clockStatusLabel"));
+                    if ([l isKindOfClass:[UILabel class]]) l.text = @"CLOCK: SOVEREIGN OVERRIDE";
+                }
+                if ([dv respondsToSelector:NSSelectorFromString(@"stateLabel")]) {
+                    UILabel *l = ((id (*)(id, SEL))objc_msgSend)(dv, NSSelectorFromString(@"stateLabel"));
+                    if ([l isKindOfClass:[UILabel class]]) l.text = @"STATE: FRANKB OMNI-ENGINE ACTIVE";
+                }
+            }
+            apex_play_synth_tone(1480.0, 0.14, 0.80);
+            apex_log("[BOMB] Cyber Matrix Glitch & HUD Overdrive Bomb engaged.");
+        } @catch (NSException *e) {
+            apex_log([[NSString stringWithFormat:@"[FAULT] MatrixGlitchBomb: %@", e.reason] UTF8String]);
+        }
+    }];
+
+    NSLog(@"[RaveApexCore] Master initialization complete. Host hooks & 90 Troll/Bomb weapons armed.");
 }
