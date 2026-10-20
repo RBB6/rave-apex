@@ -38,7 +38,8 @@ echo "clang:   $CLANG"
 codesign --remove-signature build/RaveApexCore.dylib 2>/dev/null || true
 python3 scripts/strip_sig.py build/RaveApexCore.dylib
 echo "=== post-strip verification ==="
-otool -l build/RaveApexCore.dylib 2>/dev/null | grep -c LC_CODE_SIGNATURE | sed 's/^/LC_CODE_SIGNATURE count: /'
+SIGCOUNT=$(otool -l build/RaveApexCore.dylib 2>/dev/null | grep -c LC_CODE_SIGNATURE || true)
+echo "LC_CODE_SIGNATURE count: ${SIGCOUNT} (0 = good, unsigned)"
 
 echo "=== Built build/RaveApexCore.dylib ==="
 file build/RaveApexCore.dylib || true
